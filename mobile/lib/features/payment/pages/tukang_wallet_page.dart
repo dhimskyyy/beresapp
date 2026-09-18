@@ -145,8 +145,8 @@ class _TukangWalletPageState extends State<TukangWalletPage> {
 
                 ElevatedButton(
                   onPressed: () {
-                    if (requestedAmount < 50000) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Minimal penarikan adalah Rp 50.000')));
+                    if (requestedAmount < 20000) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Minimal penarikan adalah Rp 20.000')));
                       return;
                     }
                     Navigator.pop(ctx);

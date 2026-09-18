@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import '../../core/services/supabase_storage_service.dart';
 import '../../domain/entities/ticket_status.dart';
 import '../../domain/repositories/ticket_repository.dart';
@@ -115,13 +116,35 @@ class TicketRepositoryImpl implements TicketRepository {
     required List<String> tukangServices,
     required double tukangLat,
     required double tukangLng,
+    double radiusKm = 15.0,
+    String? currentTukangId,
   }) async {
     await Future.delayed(const Duration(milliseconds: 600));
     return _mockTickets.where((t) {
       final isMatchingService = tukangServices.contains(t.category);
-      final isOpenForBidding = t.status == TicketStatus.open || t.status == TicketStatus.bidding;
-      return isMatchingService && isOpenForBidding;
+
+      // Once locked by user for a specific tukang, hide it for all OTHER tukangs!
+      final isStillOpenForOthers = t.status == TicketStatus.open || t.status == TicketStatus.bidding;
+      final isMyLockedJob = (t.status == TicketStatus.locked || t.status == TicketStatus.onTheWay || t.status == TicketStatus.inProgress) &&
+          t.selectedTukangId == currentTukangId;
+
+      final isEligibleStatus = isStillOpenForOthers || isMyLockedJob;
+
+      // Real distance calculation (Haversine formula in KM)
+      final distanceKm = _calculateHaversineDistance(tukangLat, tukangLng, t.lat, t.lng);
+      final isWithinRadius = distanceKm <= radiusKm;
+
+      return isMatchingService && isEligibleStatus && isWithinRadius;
     }).toList();
+  }
+
+  double _calculateHaversineDistance(double lat1, double lon1, double lat2, double lon2) {
+    if (lat1 == 0.0 && lon1 == 0.0) return 0.0;
+    const p = 0.017453292519943295; // Math.PI / 180
+    final a = 0.5 - math.cos((lat2 - lat1) * p)/2 + 
+            math.cos(lat1 * p) * math.cos(lat2 * p) * 
+            (1 - math.cos((lon2 - lon1) * p))/2;
+    return 12742 * math.asin(math.sqrt(a)); // 2 * R (6371 km)
   }
 
   @override

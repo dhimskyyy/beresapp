@@ -18,6 +18,8 @@ abstract class TicketRepository {
     required List<String> tukangServices,
     required double tukangLat,
     required double tukangLng,
+    double radiusKm = 15.0,
+    String? currentTukangId,
   });
 
   Future<TicketModel> submitBid({

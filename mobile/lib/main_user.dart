@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/constants/app_colors.dart';
 import 'core/constants/service_categories.dart';
+import 'data/models/user_model.dart';
 import 'data/repositories/auth_repository_impl.dart';
 import 'data/repositories/chat_repository_impl.dart';
 import 'data/repositories/payment_repository_impl.dart';
@@ -13,6 +15,7 @@ import 'features/auth/bloc/auth_state.dart';
 import 'features/auth/pages/user_login_page.dart';
 import 'features/auth/pages/user_register_page.dart';
 import 'features/chat/bloc/chat_bloc.dart';
+import 'features/chat/pages/chat_page.dart';
 import 'features/payment/bloc/payment_bloc.dart';
 import 'features/ticket/bloc/ticket_bloc.dart';
 import 'features/ticket/bloc/ticket_event.dart';
@@ -20,6 +23,7 @@ import 'features/ticket/bloc/ticket_state.dart';
 import 'features/user/pages/create_ticket_page.dart';
 import 'features/user/pages/live_tracking_page.dart';
 import 'features/user/pages/ticket_bids_page.dart';
+import 'features/user/pages/user_profile_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,7 +66,7 @@ class BeresUserApp extends StatelessWidget {
           ),
         ],
         child: MaterialApp(
-          title: 'Beres - Pencari Tukang',
+          title: 'Beres - Solusi Jasa Tukang',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
             primaryColor: AppColors.primary,
@@ -85,222 +89,580 @@ class BeresUserApp extends StatelessWidget {
   }
 }
 
-class UserMainRouter extends StatefulWidget {
+class UserMainRouter extends StatelessWidget {
   const UserMainRouter({super.key});
 
-  @override
-  State<UserMainRouter> createState() => _UserMainRouterState();
-}
-
-class _UserMainRouterState extends State<UserMainRouter> {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, state) {
         if (state is UserAuthenticatedState) {
-          final user = state.user;
+          return UserBottomNavWrapper(user: state.user);
+        }
+        return const UserLoginPage();
+      },
+    );
+  }
+}
 
-          // Fetch user's tickets
-          context.read<TicketBloc>().add(FetchUserTicketsEvent(user.id));
+class UserBottomNavWrapper extends StatefulWidget {
+  final UserModel user;
+  const UserBottomNavWrapper({super.key, required this.user});
 
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('Beres - Jasa Tukang'),
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.logout),
-                  onPressed: () {
-                    context.read<AuthBloc>().add(SignOutRequestedEvent());
-                  },
-                )
-              ],
-            ),
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+  @override
+  State<UserBottomNavWrapper> createState() => _UserBottomNavWrapperState();
+}
+
+class _UserBottomNavWrapperState extends State<UserBottomNavWrapper> {
+  int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<TicketBloc>().add(FetchUserTicketsEvent(widget.user.id));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = [
+      UserHomePage(user: widget.user, onNavigateToTicket: () => setState(() => _selectedIndex = 1)),
+      UserTicketsPage(user: widget.user),
+      UserChatListPage(user: widget.user),
+      UserProfilePage(user: widget.user),
+    ];
+
+    return Scaffold(
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: pages,
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            )
+          ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          selectedItemColor: AppColors.primary,
+          unselectedItemColor: AppColors.textMuted,
+          selectedFontSize: 12,
+          unselectedFontSize: 12,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.white,
+          elevation: 0,
+          onTap: (idx) => setState(() => _selectedIndex = idx),
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Beranda'),
+            BottomNavigationBarItem(icon: Icon(Icons.receipt_long_rounded), label: 'Pesanan'),
+            BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline_rounded), label: 'Pesan'),
+            BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), label: 'Profil'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// TAB 1: User Home Page (Modern Dashboard UI/UX)
+// -----------------------------------------------------------------------------
+class UserHomePage extends StatelessWidget {
+  final UserModel user;
+  final VoidCallback onNavigateToTicket;
+
+  const UserHomePage({super.key, required this.user, required this.onNavigateToTicket});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        body: SafeArea(
+          top: true,
+          bottom: true,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Modern Header with Location Pill & Profile Avatar
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Greeting & Active Address Card
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4)),
-                      ],
-                    ),
-                    child: Row(
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        CircleAvatar(
-                          radius: 22,
-                          backgroundColor: AppColors.primaryLight,
-                          child: Text(
-                            user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
-                            style: const TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold),
-                          ),
+                        Text(
+                          'Halo, ${user.name} 👋',
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: AppColors.textDark),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.bgAC,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text('Halo, ${user.name} 👋', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              const SizedBox(height: 2),
-                              const Text('📍 Alamat Aktif: Jl. Wijaya II No. 18, Kebayoran Baru', style: TextStyle(fontSize: 11, color: AppColors.textMuted), overflow: TextOverflow.ellipsis),
+                              Icon(Icons.location_on, size: 14, color: AppColors.primary),
+                              SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  'Jl. Wijaya II No. 18, Kebayoran Baru',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Icon(Icons.keyboard_arrow_down, size: 14, color: AppColors.primary),
                             ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-
-                  // Category Grid Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Pilih Kategori Layanan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textDark)),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/create-ticket');
-                        },
-                        child: const Text('Buat Tiket Custom', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  // 10 Service Categories Grid
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 5,
-                      mainAxisSpacing: 10,
-                      crossAxisSpacing: 8,
-                      childAspectRatio: 0.8,
+                  const SizedBox(width: 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8),
+                      ],
                     ),
-                    itemCount: ServiceCategories.all.length,
-                    itemBuilder: (context, index) {
-                      final cat = ServiceCategories.all[index];
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => CreateTicketPage(initialCategory: cat.id),
+                    child: IconButton(
+                      icon: const Icon(Icons.notifications_none_rounded, color: AppColors.textDark),
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tidak ada notifikasi baru')));
+                      },
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              // Hero Promotional & Guarantee Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.primaryDark, AppColors.primary],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6)),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.safetyAmber,
+                              borderRadius: BorderRadius.circular(6),
                             ),
-                          );
-                        },
-                        child: Column(
+                            child: const Text('GARANSI 7 HARI', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.textDark)),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Butuh Perbaikan Rumah?',
+                            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Panggil Tukang Berpengalaman Terdekat Hanya Dalam 5 Menit.',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 11),
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pushNamed(context, '/create-ticket'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: AppColors.primary,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            ),
+                            child: const Text('Buat Pesanan Custom +', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          )
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Icon(Icons.home_repair_service_rounded, size: 72, color: Colors.white24),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Category Section Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Layanan Utama', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textDark)),
+                  TextButton(
+                    onPressed: () => Navigator.pushNamed(context, '/create-ticket'),
+                    child: const Text('Lihat Semua', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // 10 Service Categories Grid (Modern UI)
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 5,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: 0.78,
+                ),
+                itemCount: ServiceCategories.all.length,
+                itemBuilder: (context, index) {
+                  final cat = ServiceCategories.all[index];
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CreateTicketPage(initialCategory: cat.id),
+                        ),
+                      );
+                    },
+                    child: Column(
+                      children: [
+                        Container(
+                          height: 52,
+                          width: 52,
+                          decoration: BoxDecoration(
+                            color: cat.backgroundColor,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 6, offset: const Offset(0, 3)),
+                            ],
+                          ),
+                          child: Icon(cat.icon, color: AppColors.primary, size: 24),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          cat.name,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textDark),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 24),
+
+              // Active Orders Section Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Status Tiket Pekerjaan Aktif', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textDark)),
+                  TextButton(
+                    onPressed: onNavigateToTicket,
+                    child: const Text('Riwayat →', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              BlocBuilder<TicketBloc, TicketState>(
+                builder: (context, ticketState) {
+                  if (ticketState is TicketListLoadedState) {
+                    final tickets = ticketState.tickets;
+                    if (tickets.isEmpty) {
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: const Column(
                           children: [
-                            Container(
-                              height: 50,
-                              width: 50,
-                              decoration: BoxDecoration(
-                                color: cat.backgroundColor,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Icon(cat.icon, color: AppColors.primary, size: 24),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              cat.name,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                            Icon(Icons.assignment_outlined, size: 36, color: AppColors.textMuted),
+                            SizedBox(height: 8),
+                            Text('Belum ada tiket pekerjaan aktif', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            SizedBox(height: 2),
+                            Text('Pilih salah satu kategori layanan di atas untuk memanggil tukang.', style: TextStyle(fontSize: 12, color: AppColors.textMuted), textAlign: TextAlign.center),
                           ],
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: tickets.length,
+                      itemBuilder: (context, idx) {
+                        final ticket = tickets[idx];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4)),
+                            ],
+                          ),
+                          child: Material(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            clipBehavior: Clip.antiAlias,
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              leading: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.bgAC,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(Icons.build_rounded, color: AppColors.primary),
+                              ),
+                              title: Text(ticket.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(ticket.status.label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text('${ticket.bids.length} penawaran', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted),
+                              onTap: () {
+                                if (ticket.status == TicketStatus.open || ticket.status == TicketStatus.bidding) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => TicketBidsPage(ticket: ticket),
+                                    ),
+                                  );
+                                } else {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => LiveTrackingPage(ticket: ticket),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  }
+
+                  return const Center(child: CircularProgressIndicator());
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// TAB 2: User Tickets / Orders Page
+// -----------------------------------------------------------------------------
+class UserTicketsPage extends StatelessWidget {
+  final UserModel user;
+  const UserTicketsPage({super.key, required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Pesanan & Tiket Saya', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: BlocBuilder<TicketBloc, TicketState>(
+        builder: (context, state) {
+          if (state is TicketListLoadedState) {
+            final tickets = state.tickets;
+            if (tickets.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.receipt_long_outlined, size: 64, color: AppColors.textMuted),
+                    const SizedBox(height: 12),
+                    const Text('Belum Ada Riwayat Pesanan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 4),
+                    const Text('Buat tiket pesanan jasa tukang pertama Anda.', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pushNamed(context, '/create-ticket'),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                      child: const Text('Buat Pesanan Baru', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    )
+                  ],
+                ),
+              );
+            }
+
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: tickets.length,
+              itemBuilder: (context, idx) {
+                final ticket = tickets[idx];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(16),
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.bgAC,
+                      child: Icon(
+                        ServiceCategories.getIconForCategory(ticket.category),
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    title: Text(ticket.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 4),
+                        Text('Kategori: ${ticket.category.toUpperCase()}', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                        const SizedBox(height: 2),
+                        Text('Status: ${ticket.status.label}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                      ],
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      if (ticket.status == TicketStatus.open || ticket.status == TicketStatus.bidding) {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => TicketBidsPage(ticket: ticket)));
+                      } else {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => LiveTrackingPage(ticket: ticket)));
+                      }
+                    },
+                  ),
+                );
+              },
+            );
+          }
+          return const Center(child: CircularProgressIndicator());
+        },
+      ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// TAB 3: User Chat List Page
+// -----------------------------------------------------------------------------
+class UserChatListPage extends StatelessWidget {
+  final UserModel user;
+  const UserChatListPage({super.key, required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Pesan & Chat', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: BlocBuilder<TicketBloc, TicketState>(
+        builder: (context, state) {
+          if (state is! TicketListLoadedState || state.tickets.isEmpty) {
+            return const Center(child: Text('Belum ada percakapan.'));
+          }
+
+          final ticket = state.tickets.first;
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8)],
+                ),
+                child: Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  clipBehavior: Clip.antiAlias,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(12),
+                    leading: const CircleAvatar(
+                      radius: 24,
+                      backgroundColor: AppColors.primaryLight,
+                      child: Icon(Icons.engineering, color: Colors.white),
+                    ),
+                    title: const Text('Pak Budi (Tukang AC)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: const Text('Saya sudah dalam perjalanan ke lokasi Pak...', style: TextStyle(fontSize: 12, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    trailing: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('10:42', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                        SizedBox(height: 4),
+                        CircleAvatar(radius: 8, backgroundColor: AppColors.dangerRed, child: Text('1', style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold))),
+                      ],
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChatPage(
+                            ticket: ticket,
+                            currentUserId: user.id,
+                            currentUserRole: 'user',
+                          ),
                         ),
                       );
                     },
                   ),
-                  const SizedBox(height: 24),
-
-                  // Active User Tickets Stream
-                  const Text('Pekerjaan / Tiket Anda', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textDark)),
-                  const SizedBox(height: 8),
-
-                  BlocBuilder<TicketBloc, TicketState>(
-                    builder: (context, ticketState) {
-                      if (ticketState is TicketListLoadedState) {
-                        final tickets = ticketState.tickets;
-                        if (tickets.isEmpty) {
-                          return Container(
-                            padding: const EdgeInsets.all(24),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Text('Belum ada tiket pekerjaan aktif. Silakan pilih kategori di atas.', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
-                          );
-                        }
-
-                        return ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: tickets.length,
-                          itemBuilder: (context, idx) {
-                            final ticket = tickets[idx];
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.all(12),
-                                leading: CircleAvatar(
-                                  backgroundColor: AppColors.bgAC,
-                                  child: Text(ticket.category.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary)),
-                                ),
-                                title: Text(ticket.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const SizedBox(height: 4),
-                                    Text('Status: ${ticket.status.label} • ${ticket.bids.length} Penawaran', style: const TextStyle(fontSize: 12, color: AppColors.primary)),
-                                  ],
-                                ),
-                                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                                onTap: () {
-                                  if (ticket.status == TicketStatus.open || ticket.status == TicketStatus.bidding) {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => TicketBidsPage(ticket: ticket),
-                                      ),
-                                    );
-                                  } else {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => LiveTrackingPage(ticket: ticket),
-                                      ),
-                                    );
-                                  }
-                                },
-                              ),
-                            );
-                          },
-                        );
-                      }
-
-                      return const Center(child: CircularProgressIndicator());
-                    },
-                  ),
-                ],
+                ),
               ),
-            ),
+            ],
           );
-        }
-
-        return const UserLoginPage();
-      },
+        },
+      ),
     );
   }
 }

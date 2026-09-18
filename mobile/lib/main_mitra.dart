@@ -19,6 +19,7 @@ import 'features/ticket/bloc/ticket_event.dart';
 import 'features/ticket/bloc/ticket_state.dart';
 import 'features/tukang/pages/mitra_active_job_page.dart';
 import 'features/tukang/pages/mitra_job_feed_page.dart';
+import 'features/tukang/pages/tukang_profile_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -170,36 +171,73 @@ class _MitraBottomNavWrapperState extends State<MitraBottomNavWrapper> {
   Widget build(BuildContext context) {
     return BlocBuilder<TicketBloc, TicketState>(
       builder: (context, state) {
+        final pages = [
+          MitraJobFeedPage(tukang: widget.tukang),
+          BlocBuilder<TicketBloc, TicketState>(
+            builder: (context, tState) {
+              if (tState is TicketListLoadedState && tState.tickets.isNotEmpty) {
+                final active = tState.tickets.first;
+                return MitraActiveJobPage(ticket: active, tukang: widget.tukang);
+              }
+              return Scaffold(
+                appBar: AppBar(title: const Text('Pengerjaan Aktif'), backgroundColor: AppColors.textDark, foregroundColor: Colors.white),
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.engineering_outlined, size: 64, color: AppColors.textMuted),
+                      const SizedBox(height: 12),
+                      const Text('Belum Ada Pengerjaan Aktif', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 4),
+                      const Text('Silakan ajukan penawaran pada tab Radar Job.', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => setState(() => _selectedIndex = 0),
+                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.textDark),
+                        child: const Text('Buka Radar Job', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          TukangWalletPage(tukang: widget.tukang),
+          TukangProfilePage(tukang: widget.tukang),
+        ];
+
         return Scaffold(
           body: IndexedStack(
             index: _selectedIndex,
-            children: [
-              MitraJobFeedPage(tukang: widget.tukang),
-              BlocBuilder<TicketBloc, TicketState>(
-                builder: (context, tState) {
-                  if (tState is TicketListLoadedState && tState.tickets.isNotEmpty) {
-                    final active = tState.tickets.first;
-                    return MitraActiveJobPage(ticket: active, tukang: widget.tukang);
-                  }
-                  return Scaffold(
-                    appBar: AppBar(title: const Text('Pengerjaan Aktif'), backgroundColor: AppColors.textDark, foregroundColor: Colors.white),
-                    body: const Center(child: Text('Belum ada pengerjaan tiket terpilih saat ini.', style: TextStyle(color: AppColors.textMuted))),
-                  );
-                },
-              ),
-              TukangWalletPage(tukang: widget.tukang),
-            ],
+            children: pages,
           ),
-          bottomNavigationBar: BottomNavigationBar(
-            currentIndex: _selectedIndex,
-            selectedItemColor: AppColors.textDark,
-            unselectedItemColor: AppColors.textMuted,
-            onTap: (idx) => setState(() => _selectedIndex = idx),
-            items: const [
-              BottomNavigationBarItem(icon: Icon(Icons.radar), label: 'Radar Job'),
-              BottomNavigationBarItem(icon: Icon(Icons.engineering), label: 'Pengerjaan Aktif'),
-              BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Dompet'),
-            ],
+          bottomNavigationBar: Container(
+            decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 10,
+                  offset: const Offset(0, -2),
+                )
+              ],
+            ),
+            child: BottomNavigationBar(
+              currentIndex: _selectedIndex,
+              selectedItemColor: AppColors.textDark,
+              unselectedItemColor: AppColors.textMuted,
+              selectedFontSize: 12,
+              unselectedFontSize: 12,
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: Colors.white,
+              elevation: 0,
+              onTap: (idx) => setState(() => _selectedIndex = idx),
+              items: const [
+                BottomNavigationBarItem(icon: Icon(Icons.radar_rounded), label: 'Radar Job'),
+                BottomNavigationBarItem(icon: Icon(Icons.engineering_rounded), label: 'Pengerjaan'),
+                BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet_rounded), label: 'Dompet'),
+                BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profil'),
+              ],
+            ),
           ),
         );
       },

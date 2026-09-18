@@ -125,8 +125,8 @@ class PaymentRepositoryImpl implements PaymentRepository {
     await Future.delayed(const Duration(milliseconds: 1000));
     final wallet = await getTukangWallet(tukangId);
 
-    if (amount < 50000) {
-      throw Exception('Minimal penarikan saldo adalah Rp 50.000');
+    if (amount < 20000) {
+      throw Exception('Minimal penarikan saldo adalah Rp 20.000');
     }
 
     if (wallet.balance < amount) {

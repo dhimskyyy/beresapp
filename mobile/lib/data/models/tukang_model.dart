@@ -80,6 +80,7 @@ class TukangModel {
   final double rating;
   final int reviewCount;
   final bool isOnline;
+  final double workRadiusKm; // Real work radius filter in km
   final TukangLocation? currentLocation;
   final DateTime createdAt;
 
@@ -103,6 +104,7 @@ class TukangModel {
     this.rating = 5.0,
     this.reviewCount = 0,
     this.isOnline = false,
+    this.workRadiusKm = 15.0,
     this.currentLocation,
     required this.createdAt,
   });
@@ -117,6 +119,54 @@ class TukangModel {
   /// Check if eligible to receive job radar and bid
   bool get canAcceptJobs {
     return verificationStatus == 'verified' && !isCurrentlySuspended && isOnline;
+  }
+
+  TukangModel copyWith({
+    String? name,
+    String? email,
+    String? phone,
+    String? photoUrl,
+    String? birthDate,
+    int? age,
+    List<String>? services,
+    List<PayoutAccount>? payoutAccounts,
+    String? ktpUrl,
+    String? verificationStatus,
+    String? rejectionReason,
+    bool? isSuspended,
+    DateTime? suspendedUntil,
+    String? suspendReason,
+    double? walletBalance,
+    double? rating,
+    int? reviewCount,
+    bool? isOnline,
+    double? workRadiusKm,
+    TukangLocation? currentLocation,
+  }) {
+    return TukangModel(
+      id: id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      photoUrl: photoUrl ?? this.photoUrl,
+      birthDate: birthDate ?? this.birthDate,
+      age: age ?? this.age,
+      services: services ?? this.services,
+      payoutAccounts: payoutAccounts ?? this.payoutAccounts,
+      ktpUrl: ktpUrl ?? this.ktpUrl,
+      verificationStatus: verificationStatus ?? this.verificationStatus,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
+      isSuspended: isSuspended ?? this.isSuspended,
+      suspendedUntil: suspendedUntil ?? this.suspendedUntil,
+      suspendReason: suspendReason ?? this.suspendReason,
+      walletBalance: walletBalance ?? this.walletBalance,
+      rating: rating ?? this.rating,
+      reviewCount: reviewCount ?? this.reviewCount,
+      isOnline: isOnline ?? this.isOnline,
+      workRadiusKm: workRadiusKm ?? this.workRadiusKm,
+      currentLocation: currentLocation ?? this.currentLocation,
+      createdAt: createdAt,
+    );
   }
 
   factory TukangModel.fromMap(Map<String, dynamic> map, String id) {
@@ -144,6 +194,7 @@ class TukangModel {
       rating: (map['rating'] as num?)?.toDouble() ?? 5.0,
       reviewCount: (map['reviewCount'] as num?)?.toInt() ?? 0,
       isOnline: map['isOnline'] ?? false,
+      workRadiusKm: (map['workRadiusKm'] as num?)?.toDouble() ?? 15.0,
       currentLocation: map['currentLocation'] != null
           ? TukangLocation.fromMap(map['currentLocation'] as Map<String, dynamic>)
           : null,
@@ -174,6 +225,7 @@ class TukangModel {
       'rating': rating,
       'reviewCount': reviewCount,
       'isOnline': isOnline,
+      'workRadiusKm': workRadiusKm,
       'currentLocation': currentLocation?.toMap(),
       'createdAt': createdAt.toIso8601String(),
     };

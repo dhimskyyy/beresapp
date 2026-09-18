@@ -46,6 +46,8 @@ class TicketBloc extends Bloc<TicketEvent, TicketState> {
         tukangServices: event.services,
         tukangLat: event.lat,
         tukangLng: event.lng,
+        radiusKm: event.radiusKm,
+        currentTukangId: event.tukangId,
       );
       emit(TicketListLoadedState(list));
     } catch (e) {

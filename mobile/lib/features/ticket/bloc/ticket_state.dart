@@ -37,6 +37,8 @@ class TukangLockedSuccessState extends TicketState {
   const TukangLockedSuccessState(this.lockedTicket);
   @override
   List<Object?> get props => [lockedTicket];
+
+  TicketModel get ticket => lockedTicket;
 }
 
 class TicketOperationFailureState extends TicketState {

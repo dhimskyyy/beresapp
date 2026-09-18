@@ -39,15 +39,19 @@ class FetchTukangRadarTicketsEvent extends TicketEvent {
   final List<String> services;
   final double lat;
   final double lng;
+  final double radiusKm;
+  final String? tukangId;
 
   const FetchTukangRadarTicketsEvent({
     required this.services,
     required this.lat,
     required this.lng,
+    this.radiusKm = 15.0,
+    this.tukangId,
   });
 
   @override
-  List<Object?> get props => [services, lat, lng];
+  List<Object?> get props => [services, lat, lng, radiusKm, tukangId];
 }
 
 class SubmitBidRequestedEvent extends TicketEvent {

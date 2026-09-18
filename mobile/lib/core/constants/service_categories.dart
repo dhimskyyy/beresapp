@@ -98,4 +98,9 @@ class ServiceCategories {
       return null;
     }
   }
+
+  static IconData getIconForCategory(String id) {
+    return findById(id)?.icon ?? Icons.build_rounded;
+  }
 }
+
