@@ -5,11 +5,13 @@
 *.env
 *.secret
 
-# Firebase configuration files (Secrets & API Keys)
+# Firebase & DOKU configuration files (Secrets & API Keys)
 google-services.json
 GoogleService-Info.plist
+doku_config.dart
 **/android/app/google-services.json
 **/ios/Runner/GoogleService-Info.plist
+**/lib/core/constants/doku_config.dart
 
 # Keys, Certificates, and Credentials
 *.keystore
