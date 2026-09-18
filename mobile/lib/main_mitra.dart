@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/constants/app_colors.dart';
 import 'data/repositories/auth_repository_impl.dart';
+import 'data/repositories/ticket_repository_impl.dart';
 import 'features/auth/bloc/auth_bloc.dart';
 import 'features/auth/bloc/auth_event.dart';
 import 'features/auth/bloc/auth_state.dart';
 import 'features/auth/pages/tukang_login_page.dart';
 import 'features/auth/pages/tukang_onboarding_page.dart';
+import 'features/ticket/bloc/ticket_bloc.dart';
+import 'features/tukang/pages/mitra_job_feed_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,12 +21,24 @@ class BeresMitraApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RepositoryProvider(
-      create: (context) => AuthRepositoryImpl(),
-      child: BlocProvider(
-        create: (context) => AuthBloc(
-          authRepository: context.read<AuthRepositoryImpl>(),
-        )..add(CheckAuthStatusEvent()),
+    return MultiRepositoryProvider(
+      providers: [
+        RepositoryProvider(create: (context) => AuthRepositoryImpl()),
+        RepositoryProvider(create: (context) => TicketRepositoryImpl()),
+      ],
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider(
+            create: (context) => AuthBloc(
+              authRepository: context.read<AuthRepositoryImpl>(),
+            )..add(CheckAuthStatusEvent()),
+          ),
+          BlocProvider(
+            create: (context) => TicketBloc(
+              ticketRepository: context.read<TicketRepositoryImpl>(),
+            ),
+          ),
+        ],
         child: MaterialApp(
           title: 'Beres Mitra - Aplikasi Tukang',
           debugShowCheckedModeBanner: false,
@@ -104,48 +119,7 @@ class MitraMainRouter extends StatelessWidget {
             );
           }
 
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('Beres Mitra Dashboard'),
-              backgroundColor: AppColors.textDark,
-              foregroundColor: Colors.white,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.logout),
-                  onPressed: () {
-                    context.read<AuthBloc>().add(SignOutRequestedEvent());
-                  },
-                )
-              ],
-            ),
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircleAvatar(
-                    radius: 40,
-                    backgroundColor: AppColors.textDark,
-                    child: Text(
-                      t.name.isNotEmpty ? t.name[0].toUpperCase() : 'M',
-                      style: const TextStyle(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Mitra Aktif: ${t.name}',
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  Text('Status: ${t.isOnline ? 'ONLINE' : 'OFFLINE'}', style: const TextStyle(color: AppColors.successGreen, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    children: t.services.map((s) => Chip(label: Text(s.toUpperCase()))).toList(),
-                  )
-                ],
-              ),
-            ),
-          );
+          return MitraJobFeedPage(tukang: t);
         }
 
         return const TukangLoginPage();

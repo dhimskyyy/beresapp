@@ -67,15 +67,15 @@ Dokumen ini berisi peta jalan pengembangan bertahap (*Step-by-Step Milestone*) u
 ---
 
 ### FASE 4: ORDER MATCHING & BIDDING SYSTEM
-- [ ] **Fitur User:**
-  - [ ] Form posting tiket keluhan (Pilih kategori, deskripsi, upload foto keluhan).
-  - [ ] Integrasi mini map Leaflet untuk pinpoint alamat rumah.
-  - [ ] Layar memantau penawaran masuk dari mitra tukang secara real-time.
-  - [ ] Fitur **Lock Tukang** untuk memilih salah satu penawaran terbaik.
-- [ ] **Fitur Mitra Tukang:**
-  - [ ] Radar tiket masuk berdasarkan kategori layanan yang dikuasai tukang.
-  - [ ] Modal input estimasi biaya & pesan penawaran (*bidding*).
-  - [ ] Pencegahan aksi: Tukang yang sedang dalam status **Suspend** dilarang mengajukan bid dan melihat banner countdown sanksi.
+- [x] **Fitur User:**
+  - [x] Form posting tiket keluhan (Pilih kategori, deskripsi, upload foto keluhan).
+  - [x] Integrasi mini map Leaflet untuk pinpoint alamat rumah.
+  - [x] Layar memantau penawaran masuk dari mitra tukang secara real-time.
+  - [x] Fitur **Lock Tukang** untuk memilih salah satu penawaran terbaik.
+- [x] **Fitur Mitra Tukang:**
+  - [x] Radar tiket masuk berdasarkan kategori layanan yang dikuasai tukang.
+  - [x] Modal input estimasi biaya & pesan penawaran (*bidding*).
+  - [x] Pencegahan aksi: Tukang yang sedang dalam status **Suspend** dilarang mengajukan bid dan melihat banner countdown sanksi.
 
 ---
 
