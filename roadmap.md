@@ -52,17 +52,17 @@ Dokumen ini berisi peta jalan pengembangan bertahap (*Step-by-Step Milestone*) u
 ---
 
 ### FASE 3: MOBILE FLUTTER CORE & AUTENTIKASI
-- [ ] Setup struktur Clean Architecture di Flutter (Core, Data, Domain, Presentation, BLoC).
-- [ ] Setup dependency injection (`get_it` / repository provider).
-- [ ] Implementasi Autentikasi Firebase:
-  - [ ] Login & Registrasi manual dengan Email & Password.
-  - [ ] Login instan via Google Sign-In.
-- [ ] **Onboarding & Registrasi Mitra Tukang:**
-  - [ ] Form biodata: Nama lengkap, tanggal lahir, umur otomatis.
-  - [ ] Form keahlian: Multi-select 10 kategori (AC, Cleaning, Las, Bangunan, Plumbing, dll.).
-  - [ ] Form metode pencairan dana: Bank (BCA, BRI, BNI, Mandiri) & E-Wallet (DANA, GoPay, OVO, ShopeePay).
-  - [ ] Fitur ambil/unggah foto KTP ke Firebase Storage.
-  - [ ] Layar tunggu konfirmasi verifikasi admin.
+- [x] Setup struktur Clean Architecture di Flutter (Core, Data, Domain, Presentation, BLoC).
+- [x] Setup dependency injection (`get_it` / repository provider).
+- [x] Implementasi Autentikasi Firebase:
+  - [x] Login & Registrasi manual dengan Email & Password.
+  - [x] Login instan via Google Sign-In.
+- [x] **Onboarding & Registrasi Mitra Tukang:**
+  - [x] Form biodata: Nama lengkap, tanggal lahir, umur otomatis.
+  - [x] Form keahlian: Multi-select 10 kategori (AC, Cleaning, Las, Bangunan, Plumbing, dll.).
+  - [x] Form metode pencairan dana: Bank (BCA, BRI, BNI, Mandiri) & E-Wallet (DANA, GoPay, OVO, ShopeePay).
+  - [x] Fitur ambil/unggah foto KTP ke Firebase Storage.
+  - [x] Layar tunggu konfirmasi verifikasi admin.
 
 ---
 
