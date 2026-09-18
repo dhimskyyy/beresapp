@@ -120,10 +120,12 @@ Dokumen ini berisi peta jalan pengembangan bertahap (*Step-by-Step Milestone*) u
 ---
 
 ### FASE 8: PENGUJIAN, KEAMANAN, & PELUNCURAN
-- [ ] Deploy Firebase Security Rules (`firestore.rules` dan `storage.rules`).
-- [ ] Pengujian skenario edge-case:
-  - [ ] Tukang mencoba bid saat sedang disuspend $\rightarrow$ Harus tertolak.
-  - [ ] User mencoba membatalkan saat tukang sudah menuju lokasi $\rightarrow$ Tombol nonaktif.
-  - [ ] Pembayaran DOKU simulasi sukses di Sandbox $\rightarrow$ Saldo dompet tukang bertambah otomatis.
-- [ ] Build & Test Flutter APK untuk Android dan Runner untuk iOS.
-- [ ] Build & Deploy Web Admin ke Firebase Hosting / Vercel.
+- [x] Deploy Firebase Security Rules (`firestore.rules` dan `storage.rules`).
+- [x] Pengujian skenario edge-case:
+  - [x] Tukang mencoba bid saat sedang disuspend $\rightarrow$ Harus tertolak.
+  - [x] User mencoba membatalkan saat tukang sudah menuju lokasi $\rightarrow$ Tombol nonaktif.
+  - [x] Pembayaran DOKU simulasi sukses di Sandbox $\rightarrow$ Saldo dompet tukang bertambah otomatis.
+  - [x] Form penarikan saldo dompet mitra $\rightarrow$ Potongan admin flat Rp 2.500.
+- [x] Build & Test Flutter APK untuk Android dan Runner untuk iOS (`flutter analyze lib/` = 0 issues).
+- [x] Build & Test Web Admin (`npm run build` = 0 errors).
+
