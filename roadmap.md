@@ -96,11 +96,12 @@ Dokumen ini berisi peta jalan pengembangan bertahap (*Step-by-Step Milestone*) u
 ---
 
 ### FASE 6: IN-APP CHAT REALTIME
-- [ ] Pembuatan sub-koleksi `tickets/{ticketId}/chats` di Firestore.
-- [ ] Tampilan antarmuka obrolan (*Chat UI*) dengan bubble pesan pengguna dan mitra.
-- [ ] Fitur pengiriman pesan teks real-time dengan status terkirim/terbaca.
-- [ ] Fitur pengiriman foto langsung dari kamera/galeri ke ruang chat.
-- [ ] Privasi nomor telepon: Nomor HP tidak ditampilkan pada profil obrolan.
+- [x] Pembuatan sub-koleksi `tickets/{ticketId}/chats` di Firestore.
+- [x] Tampilan antarmuka obrolan (*Chat UI*) dengan bubble pesan pengguna dan mitra.
+- [x] Fitur pengiriman pesan teks real-time dengan status terkirim/terbaca.
+- [x] Fitur pengiriman foto langsung dari kamera/galeri ke ruang chat via Supabase Storage.
+- [x] Privasi nomor telepon: Nomor HP tidak ditampilkan pada profil obrolan.
+
 
 ---
 

@@ -3,12 +3,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/constants/app_colors.dart';
 import 'data/models/tukang_model.dart';
 import 'data/repositories/auth_repository_impl.dart';
+import 'data/repositories/chat_repository_impl.dart';
 import 'data/repositories/ticket_repository_impl.dart';
 import 'features/auth/bloc/auth_bloc.dart';
 import 'features/auth/bloc/auth_event.dart';
 import 'features/auth/bloc/auth_state.dart';
 import 'features/auth/pages/tukang_login_page.dart';
 import 'features/auth/pages/tukang_onboarding_page.dart';
+import 'features/chat/bloc/chat_bloc.dart';
 import 'features/ticket/bloc/ticket_bloc.dart';
 import 'features/ticket/bloc/ticket_event.dart';
 import 'features/ticket/bloc/ticket_state.dart';
@@ -29,6 +31,7 @@ class BeresMitraApp extends StatelessWidget {
       providers: [
         RepositoryProvider(create: (context) => AuthRepositoryImpl()),
         RepositoryProvider(create: (context) => TicketRepositoryImpl()),
+        RepositoryProvider(create: (context) => ChatRepositoryImpl()),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -40,6 +43,11 @@ class BeresMitraApp extends StatelessWidget {
           BlocProvider(
             create: (context) => TicketBloc(
               ticketRepository: context.read<TicketRepositoryImpl>(),
+            ),
+          ),
+          BlocProvider(
+            create: (context) => ChatBloc(
+              chatRepository: context.read<ChatRepositoryImpl>(),
             ),
           ),
         ],

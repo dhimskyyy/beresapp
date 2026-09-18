@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../data/models/ticket_model.dart';
 import '../../../data/models/tukang_model.dart';
 import '../../../domain/entities/ticket_status.dart';
+import '../../chat/pages/chat_page.dart';
 import '../../ticket/bloc/ticket_bloc.dart';
 import '../../ticket/bloc/ticket_event.dart';
 import '../../ticket/bloc/ticket_state.dart';
@@ -117,6 +118,23 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
         backgroundColor: AppColors.textDark,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.chat, color: Colors.white),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ChatPage(
+                    ticket: widget.ticket,
+                    currentUserId: widget.tukang.id,
+                    currentUserRole: 'tukang',
+                  ),
+                ),
+              );
+            },
+          )
+        ],
       ),
       body: BlocConsumer<TicketBloc, TicketState>(
         listener: (context, state) {
