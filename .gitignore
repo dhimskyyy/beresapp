@@ -1,5 +1,13 @@
-/.env.example
-/api_and_integration.md
-/architecture.md
-/database_schema.md
-/design.md
+# Environment variables
+.env
+.env.local
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
