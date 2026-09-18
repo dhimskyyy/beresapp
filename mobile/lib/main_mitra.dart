@@ -167,6 +167,22 @@ class _MitraBottomNavWrapperState extends State<MitraBottomNavWrapper> {
     context.read<TicketBloc>().add(FetchTukangActiveTicketsEvent(widget.tukang.id));
   }
 
+  Widget _buildNavIcon(IconData unselectedIcon, IconData selectedIcon, int index) {
+    final isSelected = _selectedIndex == index;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      decoration: BoxDecoration(
+        color: isSelected ? AppColors.textDark.withValues(alpha: 0.12) : Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Icon(
+        isSelected ? selectedIcon : unselectedIcon,
+        color: isSelected ? AppColors.textDark : AppColors.textMuted,
+        size: isSelected ? 24 : 22,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<TicketBloc, TicketState>(
@@ -213,11 +229,12 @@ class _MitraBottomNavWrapperState extends State<MitraBottomNavWrapper> {
           ),
           bottomNavigationBar: Container(
             decoration: BoxDecoration(
+              color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, -3),
                 )
               ],
             ),
@@ -225,17 +242,29 @@ class _MitraBottomNavWrapperState extends State<MitraBottomNavWrapper> {
               currentIndex: _selectedIndex,
               selectedItemColor: AppColors.textDark,
               unselectedItemColor: AppColors.textMuted,
-              selectedFontSize: 12,
-              unselectedFontSize: 12,
+              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.white,
               elevation: 0,
               onTap: (idx) => setState(() => _selectedIndex = idx),
-              items: const [
-                BottomNavigationBarItem(icon: Icon(Icons.radar_rounded), label: 'Radar Job'),
-                BottomNavigationBarItem(icon: Icon(Icons.engineering_rounded), label: 'Pengerjaan'),
-                BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet_rounded), label: 'Dompet'),
-                BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profil'),
+              items: [
+                BottomNavigationBarItem(
+                  icon: _buildNavIcon(Icons.radar_outlined, Icons.radar_rounded, 0),
+                  label: 'Radar Job',
+                ),
+                BottomNavigationBarItem(
+                  icon: _buildNavIcon(Icons.engineering_outlined, Icons.engineering_rounded, 1),
+                  label: 'Pengerjaan',
+                ),
+                BottomNavigationBarItem(
+                  icon: _buildNavIcon(Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, 2),
+                  label: 'Dompet',
+                ),
+                BottomNavigationBarItem(
+                  icon: _buildNavIcon(Icons.person_outline_rounded, Icons.person_rounded, 3),
+                  label: 'Profil',
+                ),
               ],
             ),
           ),
