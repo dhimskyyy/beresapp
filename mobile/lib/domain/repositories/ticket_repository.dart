@@ -1,4 +1,5 @@
 import '../../data/models/ticket_model.dart';
+import '../../domain/entities/ticket_status.dart';
 
 abstract class TicketRepository {
   Future<TicketModel> createTicket({
@@ -33,6 +34,27 @@ abstract class TicketRepository {
     required String ticketId,
     required String selectedTukangId,
     required String selectedTukangName,
+  });
+
+  Future<TicketModel> updateTicketStatus({
+    required String ticketId,
+    required TicketStatus newStatus,
+    String? cancelReason,
+  });
+
+  Future<TicketModel> submitFinalBill({
+    required String ticketId,
+    required List<BillItem> items,
+  });
+
+  Future<TicketModel> approveFinalBill({
+    required String ticketId,
+  });
+
+  Future<TicketModel> uploadWorkPhotos({
+    required String ticketId,
+    required bool isBefore,
+    required List<String> photoPaths,
   });
 
   Future<List<TicketModel>> getUserTickets(String userId);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/constants/app_colors.dart';
+import 'data/models/tukang_model.dart';
 import 'data/repositories/auth_repository_impl.dart';
 import 'data/repositories/ticket_repository_impl.dart';
 import 'features/auth/bloc/auth_bloc.dart';
@@ -9,6 +10,9 @@ import 'features/auth/bloc/auth_state.dart';
 import 'features/auth/pages/tukang_login_page.dart';
 import 'features/auth/pages/tukang_onboarding_page.dart';
 import 'features/ticket/bloc/ticket_bloc.dart';
+import 'features/ticket/bloc/ticket_event.dart';
+import 'features/ticket/bloc/ticket_state.dart';
+import 'features/tukang/pages/mitra_active_job_page.dart';
 import 'features/tukang/pages/mitra_job_feed_page.dart';
 
 void main() {
@@ -119,10 +123,66 @@ class MitraMainRouter extends StatelessWidget {
             );
           }
 
-          return MitraJobFeedPage(tukang: t);
+          return MitraBottomNavWrapper(tukang: t);
         }
 
         return const TukangLoginPage();
+      },
+    );
+  }
+}
+
+class MitraBottomNavWrapper extends StatefulWidget {
+  final TukangModel tukang;
+  const MitraBottomNavWrapper({super.key, required this.tukang});
+
+  @override
+  State<MitraBottomNavWrapper> createState() => _MitraBottomNavWrapperState();
+}
+
+class _MitraBottomNavWrapperState extends State<MitraBottomNavWrapper> {
+  int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<TicketBloc>().add(FetchTukangActiveTicketsEvent(widget.tukang.id));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<TicketBloc, TicketState>(
+      builder: (context, state) {
+        return Scaffold(
+          body: IndexedStack(
+            index: _selectedIndex,
+            children: [
+              MitraJobFeedPage(tukang: widget.tukang),
+              BlocBuilder<TicketBloc, TicketState>(
+                builder: (context, tState) {
+                  if (tState is TicketListLoadedState && tState.tickets.isNotEmpty) {
+                    final active = tState.tickets.first;
+                    return MitraActiveJobPage(ticket: active, tukang: widget.tukang);
+                  }
+                  return Scaffold(
+                    appBar: AppBar(title: const Text('Pengerjaan Aktif'), backgroundColor: AppColors.textDark, foregroundColor: Colors.white),
+                    body: const Center(child: Text('Belum ada pengerjaan tiket terpilih saat ini.', style: TextStyle(color: AppColors.textMuted))),
+                  );
+                },
+              ),
+            ],
+          ),
+          bottomNavigationBar: BottomNavigationBar(
+            currentIndex: _selectedIndex,
+            selectedItemColor: AppColors.textDark,
+            unselectedItemColor: AppColors.textMuted,
+            onTap: (idx) => setState(() => _selectedIndex = idx),
+            items: const [
+              BottomNavigationBarItem(icon: Icon(Icons.radar), label: 'Radar Job'),
+              BottomNavigationBarItem(icon: Icon(Icons.engineering), label: 'Pengerjaan Aktif'),
+            ],
+          ),
+        );
       },
     );
   }

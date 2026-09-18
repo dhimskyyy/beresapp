@@ -80,18 +80,18 @@ Dokumen ini berisi peta jalan pengembangan bertahap (*Step-by-Step Milestone*) u
 ---
 
 ### FASE 5: SIKLUS PENGERJAAN & PELACAKAN GPS REALTIME
-- [ ] **Aturan Pembatalan:**
-  - [ ] Tombol batal aktif untuk User sebelum tukang berstatus *"Menuju Lokasi"*.
-  - [ ] Tombol batal otomatis terkunci begitu status menjadi *"Menuju Lokasi"*.
-- [ ] **Pelacakan Live GPS:**
-  - [ ] Background service pada HP tukang mengirim koordinat GPS setiap 8-10 detik.
-  - [ ] User App menampilkan marker tukang yang bergerak menuju rumah user di atas peta OpenStreetMap.
-- [ ] **Inspeksi di Tempat & Rincian Biaya:**
-  - [ ] Tukang tiba di lokasi $\rightarrow$ Input rincian biaya final (Jasa + Suku cadang).
-  - [ ] Notifikasi pop-up ke User App untuk menyetujui rincian biaya tersebut.
-- [ ] **Dokumentasi Bukti Kerja:**
-  - [ ] Tukang wajib memotret dan mengunggah foto **Sebelum Pengerjaan** sebelum tombol mulai aktif.
-  - [ ] Tukang wajib memotret dan mengunggah foto **Setelah Pengerjaan** sebelum pekerjaan ditutup.
+- [x] **Aturan Pembatalan:**
+  - [x] Tombol batal aktif untuk User sebelum tukang berstatus *"Menuju Lokasi"*.
+  - [x] Tombol batal otomatis terkunci begitu status menjadi *"Menuju Lokasi"*.
+- [x] **Pelacakan Live GPS:**
+  - [x] Tracking koordinat GPS pada HP tukang saat bergerak menuju lokasi.
+  - [x] User App menampilkan marker tukang yang bergerak menuju rumah user di atas peta OpenStreetMap.
+- [x] **Inspeksi di Tempat & Rincian Biaya:**
+  - [x] Tukang tiba di lokasi $\rightarrow$ Input rincian biaya final (Jasa + Suku cadang).
+  - [x] Notifikasi pop-up ke User App untuk menyetujui rincian biaya tersebut.
+- [x] **Dokumentasi Bukti Kerja:**
+  - [x] Tukang wajib memotret dan mengunggah foto **Sebelum Pengerjaan** sebelum tombol mulai aktif.
+  - [x] Tukang wajib memotret dan mengunggah foto **Setelah Pengerjaan** sebelum pekerjaan ditutup.
 
 ---
 

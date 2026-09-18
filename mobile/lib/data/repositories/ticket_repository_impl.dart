@@ -29,6 +29,16 @@ class TicketRepositoryImpl implements TicketRepository {
           createdAt: DateTime.now().subtract(const Duration(hours: 1)),
         ),
       ],
+      finalBill: FinalBill(
+        items: [
+          BillItem(title: 'Jasa Cuci Servis AC 1 PK', amount: 75000),
+          BillItem(title: 'Pembersihan Selang Pembuangan Tersumbat', amount: 50000),
+        ],
+        totalAmount: 125000,
+        approvedByUser: true,
+        createdAt: DateTime.now().subtract(const Duration(minutes: 20)),
+      ),
+      beforePhotos: ['https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600'],
       createdAt: DateTime.now().subtract(const Duration(hours: 2)),
       updatedAt: DateTime.now().subtract(const Duration(minutes: 30)),
     ),
@@ -124,8 +134,6 @@ class TicketRepositoryImpl implements TicketRepository {
 
     final oldTicket = _mockTickets[index];
     final updatedBids = List<BidModel>.from(oldTicket.bids);
-    
-    // Remove previous bid by same tukang if any
     updatedBids.removeWhere((b) => b.tukangId == tukangId);
     updatedBids.add(BidModel(
       tukangId: tukangId,
@@ -202,6 +210,176 @@ class TicketRepositoryImpl implements TicketRepository {
 
     _mockTickets[index] = updatedTicket;
     return updatedTicket;
+  }
+
+  @override
+  Future<TicketModel> updateTicketStatus({
+    required String ticketId,
+    required TicketStatus newStatus,
+    String? cancelReason,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 600));
+    final index = _mockTickets.indexWhere((t) => t.id == ticketId);
+    if (index == -1) throw Exception('Tiket tidak ditemukan');
+
+    final old = _mockTickets[index];
+    final updated = TicketModel(
+      id: old.id,
+      userId: old.userId,
+      userName: old.userName,
+      category: old.category,
+      title: old.title,
+      description: old.description,
+      photoUrls: old.photoUrls,
+      address: old.address,
+      lat: old.lat,
+      lng: old.lng,
+      status: newStatus,
+      selectedTukangId: old.selectedTukangId,
+      selectedTukangName: old.selectedTukangName,
+      bids: old.bids,
+      finalBill: old.finalBill,
+      beforePhotos: old.beforePhotos,
+      afterPhotos: old.afterPhotos,
+      paymentMethod: old.paymentMethod,
+      paymentStatus: old.paymentStatus,
+      cancelReason: cancelReason ?? old.cancelReason,
+      createdAt: old.createdAt,
+      updatedAt: DateTime.now(),
+    );
+
+    _mockTickets[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<TicketModel> submitFinalBill({
+    required String ticketId,
+    required List<BillItem> items,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 800));
+    final index = _mockTickets.indexWhere((t) => t.id == ticketId);
+    if (index == -1) throw Exception('Tiket tidak ditemukan');
+
+    final old = _mockTickets[index];
+    final double total = items.fold(0, (sum, item) => sum + item.amount);
+
+    final finalBill = FinalBill(
+      items: items,
+      totalAmount: total,
+      approvedByUser: false,
+      createdAt: DateTime.now(),
+    );
+
+    final updated = TicketModel(
+      id: old.id,
+      userId: old.userId,
+      userName: old.userName,
+      category: old.category,
+      title: old.title,
+      description: old.description,
+      photoUrls: old.photoUrls,
+      address: old.address,
+      lat: old.lat,
+      lng: old.lng,
+      status: old.status,
+      selectedTukangId: old.selectedTukangId,
+      selectedTukangName: old.selectedTukangName,
+      bids: old.bids,
+      finalBill: finalBill,
+      beforePhotos: old.beforePhotos,
+      afterPhotos: old.afterPhotos,
+      paymentMethod: old.paymentMethod,
+      paymentStatus: old.paymentStatus,
+      createdAt: old.createdAt,
+      updatedAt: DateTime.now(),
+    );
+
+    _mockTickets[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<TicketModel> approveFinalBill({required String ticketId}) async {
+    await Future.delayed(const Duration(milliseconds: 600));
+    final index = _mockTickets.indexWhere((t) => t.id == ticketId);
+    if (index == -1) throw Exception('Tiket tidak ditemukan');
+
+    final old = _mockTickets[index];
+    if (old.finalBill == null) throw Exception('Tagihan belum diinput oleh tukang');
+
+    final updatedBill = FinalBill(
+      items: old.finalBill!.items,
+      totalAmount: old.finalBill!.totalAmount,
+      approvedByUser: true,
+      createdAt: old.finalBill!.createdAt,
+    );
+
+    final updated = TicketModel(
+      id: old.id,
+      userId: old.userId,
+      userName: old.userName,
+      category: old.category,
+      title: old.title,
+      description: old.description,
+      photoUrls: old.photoUrls,
+      address: old.address,
+      lat: old.lat,
+      lng: old.lng,
+      status: old.status,
+      selectedTukangId: old.selectedTukangId,
+      selectedTukangName: old.selectedTukangName,
+      bids: old.bids,
+      finalBill: updatedBill,
+      beforePhotos: old.beforePhotos,
+      afterPhotos: old.afterPhotos,
+      paymentMethod: old.paymentMethod,
+      paymentStatus: old.paymentStatus,
+      createdAt: old.createdAt,
+      updatedAt: DateTime.now(),
+    );
+
+    _mockTickets[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<TicketModel> uploadWorkPhotos({
+    required String ticketId,
+    required bool isBefore,
+    required List<String> photoPaths,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 800));
+    final index = _mockTickets.indexWhere((t) => t.id == ticketId);
+    if (index == -1) throw Exception('Tiket tidak ditemukan');
+
+    final old = _mockTickets[index];
+    final updated = TicketModel(
+      id: old.id,
+      userId: old.userId,
+      userName: old.userName,
+      category: old.category,
+      title: old.title,
+      description: old.description,
+      photoUrls: old.photoUrls,
+      address: old.address,
+      lat: old.lat,
+      lng: old.lng,
+      status: old.status,
+      selectedTukangId: old.selectedTukangId,
+      selectedTukangName: old.selectedTukangName,
+      bids: old.bids,
+      finalBill: old.finalBill,
+      beforePhotos: isBefore ? photoPaths : old.beforePhotos,
+      afterPhotos: !isBefore ? photoPaths : old.afterPhotos,
+      paymentMethod: old.paymentMethod,
+      paymentStatus: old.paymentStatus,
+      createdAt: old.createdAt,
+      updatedAt: DateTime.now(),
+    );
+
+    _mockTickets[index] = updated;
+    return updated;
   }
 
   @override

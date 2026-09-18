@@ -4,6 +4,7 @@ import 'core/constants/app_colors.dart';
 import 'core/constants/service_categories.dart';
 import 'data/repositories/auth_repository_impl.dart';
 import 'data/repositories/ticket_repository_impl.dart';
+import 'domain/entities/ticket_status.dart';
 import 'features/auth/bloc/auth_bloc.dart';
 import 'features/auth/bloc/auth_event.dart';
 import 'features/auth/bloc/auth_state.dart';
@@ -13,6 +14,7 @@ import 'features/ticket/bloc/ticket_bloc.dart';
 import 'features/ticket/bloc/ticket_event.dart';
 import 'features/ticket/bloc/ticket_state.dart';
 import 'features/user/pages/create_ticket_page.dart';
+import 'features/user/pages/live_tracking_page.dart';
 import 'features/user/pages/ticket_bids_page.dart';
 
 void main() {
@@ -250,12 +252,21 @@ class _UserMainRouterState extends State<UserMainRouter> {
                                 ),
                                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                                 onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => TicketBidsPage(ticket: ticket),
-                                    ),
-                                  );
+                                  if (ticket.status == TicketStatus.open || ticket.status == TicketStatus.bidding) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => TicketBidsPage(ticket: ticket),
+                                      ),
+                                    );
+                                  } else {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => LiveTrackingPage(ticket: ticket),
+                                      ),
+                                    );
+                                  }
                                 },
                               ),
                             );

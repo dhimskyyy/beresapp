@@ -1,4 +1,6 @@
 import 'package:equatable/equatable.dart';
+import '../../../data/models/ticket_model.dart';
+import '../../../domain/entities/ticket_status.dart';
 
 abstract class TicketEvent extends Equatable {
   const TicketEvent();
@@ -86,9 +88,66 @@ class LockTukangRequestedEvent extends TicketEvent {
   List<Object?> get props => [ticketId, selectedTukangId, selectedTukangName];
 }
 
+class UpdateTicketStatusRequestedEvent extends TicketEvent {
+  final String ticketId;
+  final TicketStatus newStatus;
+  final String? cancelReason;
+
+  const UpdateTicketStatusRequestedEvent({
+    required this.ticketId,
+    required this.newStatus,
+    this.cancelReason,
+  });
+
+  @override
+  List<Object?> get props => [ticketId, newStatus, cancelReason];
+}
+
+class SubmitFinalBillRequestedEvent extends TicketEvent {
+  final String ticketId;
+  final List<BillItem> items;
+
+  const SubmitFinalBillRequestedEvent({
+    required this.ticketId,
+    required this.items,
+  });
+
+  @override
+  List<Object?> get props => [ticketId, items];
+}
+
+class ApproveFinalBillRequestedEvent extends TicketEvent {
+  final String ticketId;
+  const ApproveFinalBillRequestedEvent(this.ticketId);
+  @override
+  List<Object?> get props => [ticketId];
+}
+
+class UploadWorkPhotosRequestedEvent extends TicketEvent {
+  final String ticketId;
+  final bool isBefore;
+  final List<String> photoPaths;
+
+  const UploadWorkPhotosRequestedEvent({
+    required this.ticketId,
+    required this.isBefore,
+    required this.photoPaths,
+  });
+
+  @override
+  List<Object?> get props => [ticketId, isBefore, photoPaths];
+}
+
 class FetchUserTicketsEvent extends TicketEvent {
   final String userId;
   const FetchUserTicketsEvent(this.userId);
   @override
   List<Object?> get props => [userId];
+}
+
+class FetchTukangActiveTicketsEvent extends TicketEvent {
+  final String tukangId;
+  const FetchTukangActiveTicketsEvent(this.tukangId);
+  @override
+  List<Object?> get props => [tukangId];
 }
