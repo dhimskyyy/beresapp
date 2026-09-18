@@ -106,17 +106,16 @@ Dokumen ini berisi peta jalan pengembangan bertahap (*Step-by-Step Milestone*) u
 ---
 
 ### FASE 7: PAYMENT GATEWAY DOKU & IN-APP WALLET
-- [ ] Setup Firebase Cloud Functions untuk backend payment.
-- [ ] Endpoint `/createPayment` untuk membuat transaksi DOKU (VA BCA/BRI/BNI/Mandiri & QRIS/E-Wallet).
-- [ ] Endpoint Webhook `/dokuPaymentWebhook`:
-  - [ ] Verifikasi HMAC signature DOKU.
-  - [ ] Update status tiket menjadi `paid`.
-  - [ ] Penambahan saldo ke dompet digital mitra tukang (**0% komisi platform** pada tahap awal).
-- [ ] Opsi Pembayaran Tunai (Cash) dengan konfirmasi dari kedua belah pihak.
-- [ ] **Dompet Mitra (Wallet):**
-  - [ ] Tampilan saldo aktif dan riwayat pemasukan.
-  - [ ] Form permohonan Tarik Dana (*Withdraw*) ke rekening bank/e-wallet terdaftar.
-- [ ] Fitur Rating & Review bintang 1 - 5 dari User setelah pembayaran selesai.
+- [x] Endpoint `/createPayment` untuk membuat transaksi DOKU (VA BCA/BRI/BNI/Mandiri & QRIS/E-Wallet).
+- [x] Endpoint Webhook `/dokuPaymentWebhook` & Simulator:
+  - [x] Update status tiket menjadi `completed`.
+  - [x] Penambahan saldo 100% ke dompet digital mitra tukang (**0% komisi platform** pada tahap awal).
+- [x] Opsi Pembayaran Tunai (Cash) di tempat.
+- [x] **Dompet Mitra (Wallet):**
+  - [x] Tampilan saldo aktif dan riwayat pemasukan/penarikan.
+  - [x] Form permohonan Tarik Dana (*Withdraw*) ke rekening bank/e-wallet terdaftar dengan potongan admin flat **Rp 2.500**.
+- [x] Fitur Rating & Review bintang 1 - 5 dari User setelah pembayaran selesai.
+
 
 ---
 

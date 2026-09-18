@@ -4,6 +4,7 @@ import 'core/constants/app_colors.dart';
 import 'data/models/tukang_model.dart';
 import 'data/repositories/auth_repository_impl.dart';
 import 'data/repositories/chat_repository_impl.dart';
+import 'data/repositories/payment_repository_impl.dart';
 import 'data/repositories/ticket_repository_impl.dart';
 import 'features/auth/bloc/auth_bloc.dart';
 import 'features/auth/bloc/auth_event.dart';
@@ -11,6 +12,8 @@ import 'features/auth/bloc/auth_state.dart';
 import 'features/auth/pages/tukang_login_page.dart';
 import 'features/auth/pages/tukang_onboarding_page.dart';
 import 'features/chat/bloc/chat_bloc.dart';
+import 'features/payment/bloc/payment_bloc.dart';
+import 'features/payment/pages/tukang_wallet_page.dart';
 import 'features/ticket/bloc/ticket_bloc.dart';
 import 'features/ticket/bloc/ticket_event.dart';
 import 'features/ticket/bloc/ticket_state.dart';
@@ -32,6 +35,7 @@ class BeresMitraApp extends StatelessWidget {
         RepositoryProvider(create: (context) => AuthRepositoryImpl()),
         RepositoryProvider(create: (context) => TicketRepositoryImpl()),
         RepositoryProvider(create: (context) => ChatRepositoryImpl()),
+        RepositoryProvider(create: (context) => PaymentRepositoryImpl()),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -48,6 +52,11 @@ class BeresMitraApp extends StatelessWidget {
           BlocProvider(
             create: (context) => ChatBloc(
               chatRepository: context.read<ChatRepositoryImpl>(),
+            ),
+          ),
+          BlocProvider(
+            create: (context) => PaymentBloc(
+              paymentRepository: context.read<PaymentRepositoryImpl>(),
             ),
           ),
         ],
@@ -178,6 +187,7 @@ class _MitraBottomNavWrapperState extends State<MitraBottomNavWrapper> {
                   );
                 },
               ),
+              TukangWalletPage(tukang: widget.tukang),
             ],
           ),
           bottomNavigationBar: BottomNavigationBar(
@@ -188,6 +198,7 @@ class _MitraBottomNavWrapperState extends State<MitraBottomNavWrapper> {
             items: const [
               BottomNavigationBarItem(icon: Icon(Icons.radar), label: 'Radar Job'),
               BottomNavigationBarItem(icon: Icon(Icons.engineering), label: 'Pengerjaan Aktif'),
+              BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Dompet'),
             ],
           ),
         );

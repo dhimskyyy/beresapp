@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../data/models/ticket_model.dart';
 import '../../../domain/entities/ticket_status.dart';
 import '../../chat/pages/chat_page.dart';
+import '../../payment/pages/user_payment_modal.dart';
 import '../../ticket/bloc/ticket_bloc.dart';
 import '../../ticket/bloc/ticket_event.dart';
 import '../../ticket/bloc/ticket_state.dart';
@@ -268,15 +269,34 @@ class LiveTrackingPage extends StatelessWidget {
                               ),
                               child: const Text('✓ Setujui Rincian Biaya Ini', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                             )
+                          else if (ticket.status != TicketStatus.completed)
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                                  builder: (_) => UserPaymentModal(ticket: ticket),
+                                );
+                              },
+                              icon: const Icon(Icons.payment, color: Colors.white),
+                              label: const Text('Bayar Tagihan Sekarang (DOKU / Cash)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                minimumSize: const Size.fromHeight(48),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            )
                           else
                             Container(
-                              padding: const EdgeInsets.all(10),
+                              padding: const EdgeInsets.all(12),
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: AppColors.successGreen.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: AppColors.successGreen),
                               ),
-                              child: const Text('✓ Rincian Biaya Telah Disetujui User', style: TextStyle(color: AppColors.successGreen, fontWeight: FontWeight.bold, fontSize: 12)),
+                              child: const Text('✓ LUNAS - Pembayaran DOKU Berhasil', style: TextStyle(color: AppColors.successGreen, fontWeight: FontWeight.bold)),
                             ),
                           const SizedBox(height: 16),
                         ],
