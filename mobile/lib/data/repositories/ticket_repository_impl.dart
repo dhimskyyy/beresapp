@@ -1,3 +1,4 @@
+import '../../core/services/supabase_storage_service.dart';
 import '../../domain/entities/ticket_status.dart';
 import '../../domain/repositories/ticket_repository.dart';
 import '../models/ticket_model.dart';
@@ -84,7 +85,12 @@ class TicketRepositoryImpl implements TicketRepository {
     required double lat,
     required double lng,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 1000));
+    // Upload issue photos to Supabase Storage
+    final uploadedUrls = await SupabaseStorageService.uploadMultipleImages(
+      filePaths: photoUrls,
+      folder: 'tickets',
+    );
+
     final ticket = TicketModel(
       id: 'TCK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
       userId: userId,
@@ -92,7 +98,7 @@ class TicketRepositoryImpl implements TicketRepository {
       category: category,
       title: title,
       description: description,
-      photoUrls: photoUrls,
+      photoUrls: uploadedUrls,
       address: address,
       lat: lat,
       lng: lng,
@@ -349,9 +355,14 @@ class TicketRepositoryImpl implements TicketRepository {
     required bool isBefore,
     required List<String> photoPaths,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 800));
     final index = _mockTickets.indexWhere((t) => t.id == ticketId);
     if (index == -1) throw Exception('Tiket tidak ditemukan');
+
+    // Upload work photos to Supabase Storage
+    final uploadedUrls = await SupabaseStorageService.uploadMultipleImages(
+      filePaths: photoPaths,
+      folder: 'work_photos',
+    );
 
     final old = _mockTickets[index];
     final updated = TicketModel(
@@ -370,8 +381,8 @@ class TicketRepositoryImpl implements TicketRepository {
       selectedTukangName: old.selectedTukangName,
       bids: old.bids,
       finalBill: old.finalBill,
-      beforePhotos: isBefore ? photoPaths : old.beforePhotos,
-      afterPhotos: !isBefore ? photoPaths : old.afterPhotos,
+      beforePhotos: isBefore ? uploadedUrls : old.beforePhotos,
+      afterPhotos: !isBefore ? uploadedUrls : old.afterPhotos,
       paymentMethod: old.paymentMethod,
       paymentStatus: old.paymentStatus,
       createdAt: old.createdAt,

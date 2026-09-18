@@ -1,3 +1,4 @@
+import '../../core/services/supabase_storage_service.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../models/user_model.dart';
 import '../models/tukang_model.dart';
@@ -98,7 +99,12 @@ class AuthRepositoryImpl implements AuthRepository {
     required List<PayoutAccount> payoutAccounts,
     required String ktpPath,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 1500));
+    // Upload KTP to Supabase Storage
+    final uploadedKtpUrl = await SupabaseStorageService.uploadImage(
+      filePath: ktpPath,
+      folder: 'ktp',
+    );
+
     final tukang = TukangModel(
       id: 'tkg_${DateTime.now().millisecondsSinceEpoch}',
       name: name,
@@ -108,7 +114,7 @@ class AuthRepositoryImpl implements AuthRepository {
       age: age,
       services: services,
       payoutAccounts: payoutAccounts,
-      ktpUrl: ktpPath.startsWith('http') ? ktpPath : 'file://$ktpPath',
+      ktpUrl: uploadedKtpUrl,
       verificationStatus: 'pending_verification',
       isOnline: false,
       createdAt: DateTime.now(),
