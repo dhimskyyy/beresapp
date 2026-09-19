@@ -128,7 +128,10 @@ class _UserBottomNavWrapperState extends State<UserBottomNavWrapper> {
       UserHomePage(user: widget.user, onNavigateToTicket: () => setState(() => _selectedIndex = 1)),
       UserTicketsPage(user: widget.user),
       UserChatListPage(user: widget.user),
-      UserProfilePage(user: widget.user),
+      UserProfilePage(
+        user: widget.user,
+        onNavigateToOrders: () => setState(() => _selectedIndex = 1),
+      ),
     ];
 
     return Scaffold(
@@ -207,26 +210,29 @@ class UserHomePage extends StatelessWidget {
                           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: AppColors.textDark),
                         ),
                         const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.bgAC,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.location_on, size: 14, color: AppColors.primary),
-                              SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  'Jl. Wijaya II No. 18, Kebayoran Baru',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
-                                  overflow: TextOverflow.ellipsis,
+                        GestureDetector(
+                          onTap: () => _showLocationSelector(context),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.bgAC,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.location_on, size: 14, color: AppColors.primary),
+                                SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    'Jl. Wijaya II No. 18, Kebayoran Baru',
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                              ),
-                              Icon(Icons.keyboard_arrow_down, size: 14, color: AppColors.primary),
-                            ],
+                                Icon(Icons.keyboard_arrow_down, size: 14, color: AppColors.primary),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -241,11 +247,25 @@ class UserHomePage extends StatelessWidget {
                         BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8),
                       ],
                     ),
-                    child: IconButton(
-                      icon: const Icon(Icons.notifications_none_rounded, color: AppColors.textDark),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tidak ada notifikasi baru')));
-                      },
+                    child: Stack(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.notifications_none_rounded, color: AppColors.textDark),
+                          onPressed: () => _showUserNotificationCenter(context),
+                        ),
+                        Positioned(
+                          right: 8,
+                          top: 8,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: AppColors.dangerRed,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -500,6 +520,174 @@ class UserHomePage extends StatelessWidget {
         ),
       ),
     ),
+    );
+  }
+
+  void _showLocationSelector(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.location_on, color: AppColors.primary),
+                    SizedBox(width: 8),
+                    Text('Pilih Alamat Pekerjaan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+              ],
+            ),
+            const Divider(),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: AppColors.bgAC, child: Icon(Icons.home, color: AppColors.primary)),
+              title: const Text('Rumah (Alamat Utama)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text('Jl. Wijaya II No. 18, Kebayoran Baru, Jakarta Selatan', style: TextStyle(fontSize: 11)),
+              trailing: const Icon(Icons.check_circle, color: AppColors.successGreen),
+              onTap: () {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Alamat lokasi aktif: Rumah (Utama)')),
+                );
+              },
+            ),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: AppColors.bgAC, child: Icon(Icons.business, color: AppColors.primary)),
+              title: const Text('Kantor', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text('Gedung Menara Mandiri Lt. 12, Senayan, Jakarta Selatan', style: TextStyle(fontSize: 11)),
+              trailing: const Icon(Icons.radio_button_unchecked, color: AppColors.textMuted),
+              onTap: () {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Alamat lokasi aktif: Kantor')),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pushNamed(context, '/create-ticket');
+                },
+                icon: const Icon(Icons.add_location_alt_outlined),
+                label: const Text('Gunakan Alamat Kustom di Tiket Baru'),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showUserNotificationCenter(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => DefaultTabController(
+        length: 2,
+        child: Container(
+          height: MediaQuery.of(ctx).size.height * 0.75,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.notifications_active_rounded, color: AppColors.primary, size: 24),
+                      SizedBox(width: 8),
+                      Text('Notifikasi Pesanan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textDark)),
+                    ],
+                  ),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: ListView(
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Material(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        clipBehavior: Clip.antiAlias,
+                        child: ListTile(
+                          leading: const CircleAvatar(
+                            backgroundColor: AppColors.bgAC,
+                            child: Icon(Icons.engineering_rounded, color: AppColors.primary),
+                          ),
+                          title: const Text('Tukang Menuju Lokasi Anda', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          subtitle: const Text('Pak Budi (AC) sedang dalam perjalanan. Perkiraan sampai 15 menit lagi.', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                          trailing: const Text('10:42', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            onNavigateToTicket();
+                          },
+                        ),
+                      ),
+                    ),
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Material(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        clipBehavior: Clip.antiAlias,
+                        child: ListTile(
+                          leading: const CircleAvatar(
+                            backgroundColor: Color(0xFFDCFCE7),
+                            child: Icon(Icons.handyman_rounded, color: AppColors.successGreen),
+                          ),
+                          title: const Text('Penawaran Baru Masuk!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          subtitle: const Text('Mitra telah mengajukan penawaran untuk pesanan perbaikan pompa air Anda.', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                          trailing: const Text('Kemarin', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            onNavigateToTicket();
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -540,6 +540,7 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
     final currentPayout = _payoutAccounts.isNotEmpty ? _payoutAccounts.first : null;
 
     return Scaffold(
+      backgroundColor: AppColors.textDark,
       appBar: AppBar(
         title: const Text('Profil Mitra Tukang', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         backgroundColor: AppColors.textDark,
@@ -618,11 +619,14 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
               ),
             ),
 
-            const SizedBox(height: 16),
-
-            // Profile Sections
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            // Profile Sections (Rounded top light container)
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

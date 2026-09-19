@@ -54,6 +54,23 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
     return dist < 0.5 ? 1.2 : dist;
   }
 
+  String _formatTimeAgo(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inSeconds < 60) {
+      return 'Baru saja';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} mnt lalu';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} jam lalu';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} hari lalu';
+    } else {
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    }
+  }
+
   /// 1-Click Instant Bidding
   void _submitDirect1ClickBid(TicketModel ticket) {
     if (widget.tukang.isCurrentlySuspended) {
@@ -196,23 +213,31 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                               itemCount: radarTickets.length,
                               itemBuilder: (context, index) {
                                 final t = radarTickets[index];
-                                return Card(
+                                return Container(
                                   margin: const EdgeInsets.only(bottom: 10),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  child: ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundColor: AppColors.textDark.withValues(alpha: 0.1),
-                                      child: Icon(ServiceCategories.getIconForCategory(t.category), color: AppColors.textDark, size: 20),
-                                    ),
-                                    title: Text(t.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                    subtitle: Text('📍 ${t.address}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted), maxLines: 1),
-                                    trailing: ElevatedButton(
-                                      onPressed: () {
-                                        Navigator.pop(ctx);
-                                        _showJobDetailBottomSheet(context, t, 2.4);
-                                      },
-                                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.textDark, minimumSize: const Size(60, 32)),
-                                      child: const Text('Detail', style: TextStyle(color: Colors.white, fontSize: 11)),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppColors.border),
+                                  ),
+                                  child: Material(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: ListTile(
+                                      leading: CircleAvatar(
+                                        backgroundColor: AppColors.textDark.withValues(alpha: 0.1),
+                                        child: Icon(ServiceCategories.getIconForCategory(t.category), color: AppColors.textDark, size: 20),
+                                      ),
+                                      title: Text(t.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                      subtitle: Text('📍 ${t.address} • ${_formatTimeAgo(t.createdAt)}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted), maxLines: 1),
+                                      trailing: ElevatedButton(
+                                        onPressed: () {
+                                          Navigator.pop(ctx);
+                                          _showJobDetailBottomSheet(context, t, 2.4);
+                                        },
+                                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.textDark, minimumSize: const Size(60, 32)),
+                                        child: const Text('Detail', style: TextStyle(color: Colors.white, fontSize: 11)),
+                                      ),
                                     ),
                                   ),
                                 );
@@ -239,31 +264,35 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
-      child: ListTile(
-        onTap: onTap,
-        leading: CircleAvatar(
-          backgroundColor: AppColors.safetyAmber,
-          child: Text(name[0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        ),
-        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        subtitle: Text(message, style: const TextStyle(fontSize: 12, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(time, style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
-            if (unreadCount > 0) ...[
-              const SizedBox(height: 4),
-              CircleAvatar(
-                radius: 8,
-                backgroundColor: AppColors.dangerRed,
-                child: Text('$unreadCount', style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            ]
-          ],
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          onTap: onTap,
+          leading: CircleAvatar(
+            backgroundColor: AppColors.safetyAmber,
+            child: Text(name[0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+          title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          subtitle: Text(message, style: const TextStyle(fontSize: 12, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(time, style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
+              if (unreadCount > 0) ...[
+                const SizedBox(height: 4),
+                CircleAvatar(
+                  radius: 8,
+                  backgroundColor: AppColors.dangerRed,
+                  child: Text('$unreadCount', style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ]
+            ],
+          ),
         ),
       ),
     );
@@ -312,14 +341,20 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                         Text(ticket.category.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.primary)),
                       ],
                     ),
-                  ),
+                  ),                  
                   IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
                 ],
               ),
               const SizedBox(height: 8),
               Text(ticket.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textDark)),
               const SizedBox(height: 4),
-              Text('📍 ${distance.toStringAsFixed(1)} km dari lokasi Anda', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.successGreen)),
+              Row(
+                children: [
+                  Text('📍 ${distance.toStringAsFixed(1)} km dari lokasi Anda', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.successGreen)),
+                  const SizedBox(width: 8),
+                  Text('• Diposting: ${_formatTimeAgo(ticket.createdAt)}', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                ],
+              ),
               const Divider(height: 24),
 
               Expanded(
@@ -328,7 +363,7 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Deskripsi Pekerjaan
-                      const Text('Deskripsi Permintaan User:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textMuted)),
+                      const Text('Deskripsi Job:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textMuted)),
                       const SizedBox(height: 6),
                       Container(
                         width: double.infinity,
@@ -444,7 +479,7 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                         color: isLockedByMe ? Colors.white : AppColors.textMuted,
                       ),
                       label: Text(
-                        isLockedByMe ? 'Mulai Pekerjaan' : 'Mulai (Terkunci)',
+                        isLockedByMe ? 'Mulai' : 'Mulai',
                         style: TextStyle(
                           color: isLockedByMe ? Colors.white : AppColors.textMuted,
                           fontWeight: FontWeight.bold,
@@ -511,6 +546,7 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
       case TicketStatus.locked:
         return 2;
       case TicketStatus.onTheWay:
+      case TicketStatus.arrived:
       case TicketStatus.inProgress:
       case TicketStatus.workCompleted:
         return 3;
@@ -738,7 +774,7 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _isOnline ? 'STATUS: ONLINE (SIAP TERIMA JOB)' : 'STATUS: OFFLINE (ISTIRAHAT)',
+                              _isOnline ? 'STATUS: ONLINE' : 'STATUS: OFFLINE',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
@@ -759,7 +795,7 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                       onChanged: (val) {
                         setState(() => _isOnline = val);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(val ? 'Status Mitra: ONLINE (Aktif Memantau Job)' : 'Status Mitra: OFFLINE')),
+                          SnackBar(content: Text(val ? 'Anda Kembali ONLINE' : 'Anda Sedang OFFLINE')),
                         );
                       },
                     ),
@@ -795,17 +831,45 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                 ),
 
               const SizedBox(height: 8),
-              // Category Filter Bar (Horizontal Chips)
-              Container(
-                height: 40,
-                margin: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    _buildFilterChip('all', 'Semua Kategori', Icons.grid_view_rounded),
-                    ...ServiceCategories.all.map((cat) => _buildFilterChip(cat.id, cat.name, cat.icon)),
-                  ],
-                ),
+
+              // Category Filter Bar (Horizontal Chips with Red Notification Badge Dot)
+              BlocBuilder<TicketBloc, TicketState>(
+                builder: (context, state) {
+                  final allTickets = state is TicketListLoadedState ? state.tickets : <TicketModel>[];
+                  final tukangServices = widget.tukang.services;
+
+                  // Categories matching tukang's skills
+                  final relevantCategories = ServiceCategories.all
+                      .where((cat) => tukangServices.contains(cat.id))
+                      .toList();
+
+                  final hasAnyNewJob = allTickets.any((t) => tukangServices.contains(t.category));
+
+                  return Container(
+                    height: 40,
+                    margin: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        _buildFilterChip(
+                          'all',
+                          'Semua Kategori',
+                          Icons.grid_view_rounded,
+                          hasNewBadge: hasAnyNewJob,
+                        ),
+                        ...relevantCategories.map((cat) {
+                          final hasNewInCat = allTickets.any((t) => t.category == cat.id);
+                          return _buildFilterChip(
+                            cat.id,
+                            cat.name,
+                            cat.icon,
+                            hasNewBadge: hasNewInCat,
+                          );
+                        }),
+                      ],
+                    ),
+                  );
+                },
               ),
 
               // Job Radar Feed List
@@ -880,27 +944,49 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Top Badge Row (Category + Distance Pill)
+                                  // Top Badge Row (Category + Time Ago + Distance Pill)
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.bgAC,
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(ServiceCategories.getIconForCategory(ticket.category), size: 14, color: AppColors.primary),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              ticket.category.toUpperCase(),
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.primary),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.bgAC,
+                                              borderRadius: BorderRadius.circular(8),
                                             ),
-                                          ],
-                                        ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(ServiceCategories.getIconForCategory(ticket.category), size: 14, color: AppColors.primary),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  ticket.category.toUpperCase(),
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.primary),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey.shade100,
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.access_time_rounded, size: 12, color: Colors.grey.shade700),
+                                                const SizedBox(width: 3),
+                                                Text(
+                                                  _formatTimeAgo(ticket.createdAt),
+                                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -914,7 +1000,7 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                                             const Icon(Icons.location_on, size: 12, color: AppColors.successGreen),
                                             const SizedBox(width: 2),
                                             Text(
-                                              '📍 ${distance.toStringAsFixed(1)} km dari lokasi Anda',
+                                              '📍 ${distance.toStringAsFixed(1)} km',
                                               style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.successGreen),
                                             ),
                                           ],
@@ -979,7 +1065,7 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                                             size: 16,
                                           ),
                                           label: Text(
-                                            hasAlreadyBid ? '✓ Anda Sudah Bid' : 'Ajukan Bid (1-Click)',
+                                            hasAlreadyBid ? '✓ Anda Sudah Bid' : 'Bid',
                                             style: TextStyle(
                                               color: hasAlreadyBid ? AppColors.textMuted : Colors.white,
                                               fontWeight: FontWeight.bold,
@@ -1065,7 +1151,7 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
     );
   }
 
-  Widget _buildFilterChip(String id, String label, IconData icon) {
+  Widget _buildFilterChip(String id, String label, IconData icon, {bool hasNewBadge = false}) {
     final isSelected = _selectedCategoryFilter == id;
     return GestureDetector(
       onTap: () {
@@ -1073,33 +1159,59 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
           _selectedCategoryFilter = id;
         });
       },
-      child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.textDark : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? AppColors.textDark : AppColors.border),
-          boxShadow: [
-            if (isSelected)
-              BoxShadow(color: AppColors.textDark.withValues(alpha: 0.2), blurRadius: 6, offset: const Offset(0, 2)),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: isSelected ? Colors.white : AppColors.textDark),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? Colors.white : AppColors.textDark,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(right: 10, top: 3, bottom: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isSelected ? AppColors.textDark : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: isSelected ? AppColors.textDark : AppColors.border),
+              boxShadow: [
+                if (isSelected)
+                  BoxShadow(color: AppColors.textDark.withValues(alpha: 0.2), blurRadius: 6, offset: const Offset(0, 2)),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 14, color: isSelected ? Colors.white : AppColors.textDark),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected ? Colors.white : AppColors.textDark,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (hasNewBadge)
+            Positioned(
+              top: 1,
+              right: 6,
+              child: Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(
+                  color: AppColors.dangerRed,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.dangerRed.withValues(alpha: 0.5),
+                      blurRadius: 4,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }

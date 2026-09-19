@@ -1,172 +1,732 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/user_model.dart';
+import '../../../data/models/user_saved_address.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/bloc/auth_event.dart';
+import 'user_address_list_page.dart';
+import 'user_edit_profile_page.dart';
+import 'user_favorite_tradesmen_page.dart';
+import 'user_help_center_page.dart';
+import 'user_settings_page.dart';
+import 'user_terms_privacy_page.dart';
+import 'user_wallet_page.dart';
 
-class UserProfilePage extends StatelessWidget {
+class UserProfilePage extends StatefulWidget {
   final UserModel user;
+  final VoidCallback? onNavigateToOrders;
 
-  const UserProfilePage({super.key, required this.user});
+  const UserProfilePage({
+    super.key,
+    required this.user,
+    this.onNavigateToOrders,
+  });
+
+  @override
+  State<UserProfilePage> createState() => _UserProfilePageState();
+}
+
+class _UserProfilePageState extends State<UserProfilePage> {
+  double _walletBalance = 350000;
+  bool _pushNotification = true;
+  bool _whatsappNotification = true;
+  String _activeAddressId = '1';
+
+  late String _userName;
+  late String _userPhone;
+  late List<UserSavedAddress> _savedAddresses;
+
+  @override
+  void initState() {
+    super.initState();
+    _userName = widget.user.name.isNotEmpty ? widget.user.name : 'Dhimas';
+    _userPhone = widget.user.phone.isNotEmpty
+        ? widget.user.phone
+        : '081234567890';
+
+    _savedAddresses = [
+      UserSavedAddress(
+        id: '1',
+        label: 'Rumah (Utama)',
+        recipientName: _userName,
+        phone: _userPhone,
+        fullAddress:
+            'Jl. Wijaya II No. 18, RT 05 / RW 02, Kebayoran Baru, Jakarta Selatan',
+        note: 'Patokan: Pagar hitam depan pos satpam',
+        isPrimary: true,
+        latitude: -6.2443,
+        longitude: 106.8044,
+      ),
+      UserSavedAddress(
+        id: '2',
+        label: 'Kantor',
+        recipientName: _userName,
+        phone: _userPhone,
+        fullAddress:
+            'Gedung Menara Mandiri Lt. 12, Jl. Jend. Sudirman Kav 54-55, Jakarta Selatan',
+        note: 'Lobi Selatan / Meja Resepsionis',
+        isPrimary: false,
+        latitude: -6.2250,
+        longitude: 106.8080,
+      ),
+    ];
+  }
+
+  String _formatCurrency(double amount) {
+    return amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]}.',
+        );
+  }
+
+  void _navigateToSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UserSettingsPage(
+          initialPushNotification: _pushNotification,
+          initialWhatsappNotification: _whatsappNotification,
+        ),
+      ),
+    ).then((result) {
+      if (result is Map) {
+        setState(() {
+          _pushNotification = result['push'] ?? _pushNotification;
+          _whatsappNotification =
+              result['whatsapp'] ?? _whatsappNotification;
+        });
+      }
+    });
+  }
+
+  void _navigateToEditProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UserEditProfilePage(
+          currentName: _userName,
+          currentPhone: _userPhone,
+          email: widget.user.email,
+        ),
+      ),
+    ).then((result) {
+      if (result is Map) {
+        setState(() {
+          _userName = result['name'] ?? _userName;
+          _userPhone = result['phone'] ?? _userPhone;
+        });
+      }
+    });
+  }
+
+  void _navigateToAddressList() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UserAddressListPage(
+          initialAddresses: _savedAddresses,
+          activeAddressId: _activeAddressId,
+          userName: _userName,
+          userPhone: _userPhone,
+          onAddressesChanged: (updatedAddresses, newActiveId) {
+            setState(() {
+              _savedAddresses = updatedAddresses;
+              _activeAddressId = newActiveId;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  void _navigateToWallet() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UserWalletPage(
+          currentBalance: _walletBalance,
+          onBalanceUpdated: (newBalance) {
+            setState(() {
+              _walletBalance = newBalance;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  void _navigateToFavoriteTradesmen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UserFavoriteTradesmenPage(
+          onNavigateToOrders: widget.onNavigateToOrders,
+        ),
+      ),
+    );
+  }
+
+  void _navigateToHelpCenter() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const UserHelpCenterPage(),
+      ),
+    );
+  }
+
+  void _navigateToTermsPrivacy() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const UserTermsPrivacyPage(),
+      ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Konfirmasi Keluar',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            'Apakah Anda yakin ingin keluar dari akun BeresApp?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text(
+                'Batal',
+                style: TextStyle(color: AppColors.textMuted),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(dialogCtx);
+                context.read<AuthBloc>().add(SignOutRequestedEvent());
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.dangerRed,
+              ),
+              child: const Text(
+                'Keluar',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profil Saya', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Pengaturan aplikasi')),
-              );
-            },
-          )
-        ],
+    final activeAddress = _savedAddresses.firstWhere(
+      (a) => a.id == _activeAddressId,
+      orElse: () => _savedAddresses.first,
+    );
+
+    const Color headerTopColor = Color(0xFF1E3A8A);
+    const Color bodyColor = Color(0xFFF8FAFC);
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: bodyColor,
+        systemNavigationBarIconBrightness: Brightness.dark,
       ),
-      body: SingleChildScrollView(
-        child: Column(
+      child: Scaffold(
+        backgroundColor: bodyColor,
+        body: Stack(
           children: [
-            // User Info Header Card
-            Container(
-              width: double.infinity,
-              color: AppColors.primary,
-              padding: const EdgeInsets.only(left: 20, right: 20, bottom: 24, top: 8),
-              child: Column(
-                children: [
-                  Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      CircleAvatar(
-                        radius: 44,
-                        backgroundColor: Colors.white,
-                        child: CircleAvatar(
-                          radius: 41,
-                          backgroundColor: AppColors.primaryLight,
-                          child: Text(
-                            user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
-                            style: const TextStyle(fontSize: 36, color: Colors.white, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: AppColors.successGreen,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.check, color: Colors.white, size: 14),
-                      ),
-                    ],
+            // Background split:
+            // Top half matches header top color for top overscroll.
+            // Bottom half matches body background for bottom overscroll.
+            Column(
+              children: [
+                Expanded(
+                  child: Container(
+                    color: headerTopColor,
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    user.name,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                Expanded(
+                  child: Container(
+                    color: bodyColor,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    user.email,
-                    style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.8)),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    user.phone,
-                    style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.8)),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
 
-            const SizedBox(height: 16),
-
-            // Main Menu Options List
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Column(
+            CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                // Modern Decorated Sliver AppBar & Profile Header
+                SliverToBoxAdapter(
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Color(0xFF1E3A8A),
+                          Color(0xFF2563EB),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+              child: Stack(
                 children: [
-                  _buildProfileTile(
-                    icon: Icons.location_on_outlined,
-                    iconBg: const Color(0xFFEFF6FF),
-                    iconColor: AppColors.primary,
-                    title: 'Alamat Tersimpan',
-                    subtitle: 'Jl. Wijaya II No. 18, Kebayoran Baru (Utama)',
-                    onTap: () {
-                      _showAddressModal(context);
-                    },
+                  // Decorative Ambient Orbs
+                  Positioned(
+                    top: -40,
+                    right: -30,
+                    child: Container(
+                      width: 170,
+                      height: 170,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.05),
+                      ),
+                    ),
                   ),
-                  _buildProfileTile(
-                    icon: Icons.account_balance_wallet_outlined,
-                    iconBg: const Color(0xFFECFDF5),
-                    iconColor: AppColors.successGreen,
-                    title: 'Metode Pembayaran & E-Wallet',
-                    subtitle: 'Saldomu / QRIS / Transfer Bank',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Manajemen Pembayaran User')),
-                      );
-                    },
-                  ),
-                  _buildProfileTile(
-                    icon: Icons.history_rounded,
-                    iconBg: const Color(0xFFF5F3FF),
-                    iconColor: Colors.purple,
-                    title: 'Riwayat Pesanan',
-                    subtitle: 'Daftar tiket pekerjaan yang selesai',
-                    onTap: () {},
-                  ),
-                  _buildProfileTile(
-                    icon: Icons.shield_outlined,
-                    iconBg: const Color(0xFFFEF3C7),
-                    iconColor: AppColors.safetyAmber,
-                    title: 'Garansi & Perlindungan Layanan',
-                    subtitle: 'Garansi 7 hari untuk setiap perbaikan',
-                    onTap: () {},
-                  ),
-                  _buildProfileTile(
-                    icon: Icons.help_outline_rounded,
-                    iconBg: const Color(0xFFE0F2FE),
-                    iconColor: Colors.blueAccent,
-                    title: 'Pusat Bantuan & Customer Service',
-                    subtitle: 'FAQ / Hubungi CS Beres 24/7',
-                    onTap: () {},
-                  ),
-                  _buildProfileTile(
-                    icon: Icons.description_outlined,
-                    iconBg: const Color(0xFFF1F5F9),
-                    iconColor: AppColors.textMuted,
-                    title: 'Syarat, Ketentuan & Privasi',
-                    subtitle: 'Kebijakan privasi & aturan pengguna',
-                    onTap: () {},
+                  Positioned(
+                    top: 200,
+                    left: -20,
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.blueAccent.withValues(alpha: 0.12),
+                      ),
+                    ),
                   ),
 
-                  const SizedBox(height: 20),
+                  // Content Column: Header on top, White Body nested below inside the patterned blue container
+                  Column(
+                    children: [
+                      SafeArea(
+                        bottom: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                          child: Column(
+                        children: [
+                          // Top Navigation Bar Row
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Profil Akun',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.settings_outlined,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                                onPressed: _navigateToSettings,
+                                tooltip: 'Pengaturan',
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // User Avatar & Badges
+                          Stack(
+                            alignment: Alignment.bottomRight,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(3.5),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF60A5FA),
+                                      Colors.white,
+                                      Color(0xFF3B82F6),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.25,
+                                      ),
+                                      blurRadius: 14,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: CircleAvatar(
+                                  radius: 42,
+                                  backgroundColor: const Color(0xFF1E293B),
+                                  child: Text(
+                                    _userName.isNotEmpty
+                                        ? _userName[0].toUpperCase()
+                                        : 'U',
+                                    style: const TextStyle(
+                                      fontSize: 34,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: _navigateToEditProfile,
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryLight,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.2,
+                                        ),
+                                        blurRadius: 6,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.edit_outlined,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // User Name
+                          Text(
+                            _userName,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+
+                          // Email & Phone
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.email_outlined,
+                                size: 13,
+                                color: Colors.white.withValues(alpha: 0.8),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                widget.user.email,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '•',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.6),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.phone_outlined,
+                                size: 13,
+                                color: Colors.white.withValues(alpha: 0.8),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _userPhone,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // Ubah Profil Button
+                          GestureDetector(
+                            onTap: _navigateToEditProfile,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 7,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.16),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.edit_note_rounded,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Ubah Profil',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Main Body Section with Rounded Top Container seamlessly nested inside the patterned blue container
+                  Container(
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                    ),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 16),
+
+                  // -----------------------------------------------------------
+                  // SECTION 1: AKUN & PEMBAYARAN (Moved seamlessly to the top)
+                  // -----------------------------------------------------------
+                  _buildSectionHeader('AKUN & PEMBAYARAN'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Column(
+                      children: [
+                        _buildProfileTile(
+                          icon: Icons.location_on_outlined,
+                          iconBg: const Color(0xFFEFF6FF),
+                          iconColor: AppColors.primary,
+                          title: 'Alamat Tersimpan',
+                          subtitle:
+                              '${activeAddress.label} • ${activeAddress.fullAddress}',
+                          badgeText: '${_savedAddresses.length} Alamat',
+                          onTap: _navigateToAddressList,
+                        ),
+                        _buildProfileTile(
+                          icon: Icons.account_balance_wallet_outlined,
+                          iconBg: const Color(0xFFECFDF5),
+                          iconColor: AppColors.successGreen,
+                          title: 'Metode Pembayaran & Saldo',
+                          subtitle:
+                              'Saldomu: Rp ${_formatCurrency(_walletBalance)} • QRIS & VA',
+                          onTap: _navigateToWallet,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // -----------------------------------------------------------
+                  // SECTION 2: PESANAN & MITRA TUKANG
+                  // -----------------------------------------------------------
+                  _buildSectionHeader('PESANAN & MITRA TUKANG'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Column(
+                      children: [
+                        _buildProfileTile(
+                          icon: Icons.receipt_long_outlined,
+                          iconBg: const Color(0xFFEFF6FF),
+                          iconColor: Colors.blueAccent,
+                          title: 'Riwayat Pesanan',
+                          subtitle:
+                              'Daftar pekerjaan aktif, progres, & nota pembayaran',
+                          onTap: () {
+                            if (widget.onNavigateToOrders != null) {
+                              widget.onNavigateToOrders!();
+                            }
+                          },
+                        ),
+                        _buildProfileTile(
+                          icon: Icons.star_outline_rounded,
+                          iconBg: const Color(0xFFFFF7ED),
+                          iconColor: AppColors.safetyAmber,
+                          title: 'Tukang Favorit Saya',
+                          subtitle:
+                              'Mitra tukang terpercaya yang telah Anda simpan',
+                          onTap: _navigateToFavoriteTradesmen,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // -----------------------------------------------------------
+                  // SECTION 3: BANTUAN & PUSAT INFORMASI
+                  // -----------------------------------------------------------
+                  _buildSectionHeader('BANTUAN & PUSAT INFORMASI'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Column(
+                      children: [
+                        _buildProfileTile(
+                          icon: Icons.support_agent_rounded,
+                          iconBg: const Color(0xFFE0F2FE),
+                          iconColor: Colors.blueAccent,
+                          title: 'Pusat Bantuan & Customer Service',
+                          subtitle: 'FAQ kendala pesanan & chat WhatsApp CS',
+                          badgeText: 'Online 24 Jam',
+                          badgeColor: AppColors.successGreen,
+                          onTap: _navigateToHelpCenter,
+                        ),
+                        _buildProfileTile(
+                          icon: Icons.description_outlined,
+                          iconBg: const Color(0xFFF8FAFC),
+                          iconColor: AppColors.textMuted,
+                          title: 'Syarat, Ketentuan & Privasi',
+                          subtitle:
+                              'Kebijakan privasi resmi & perlindungan data',
+                          onTap: _navigateToTermsPrivacy,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
 
                   // Logout Button Card
                   Container(
                     width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 24),
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
                     child: OutlinedButton.icon(
                       onPressed: () => _showLogoutDialog(context),
-                      icon: const Icon(Icons.logout, color: AppColors.dangerRed),
-                      label: const Text('Keluar dari Akun', style: TextStyle(color: AppColors.dangerRed, fontWeight: FontWeight.bold)),
+                      icon: const Icon(
+                        Icons.logout,
+                        color: AppColors.dangerRed,
+                        size: 20,
+                      ),
+                      label: const Text(
+                        'Keluar dari Akun',
+                        style: TextStyle(
+                          color: AppColors.dangerRed,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: const BorderSide(color: AppColors.dangerRed, width: 1.5),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        side: const BorderSide(
+                          color: Color(0xFFFECACA),
+                          width: 1.5,
+                        ),
+                        backgroundColor: const Color(0xFFFEF2F2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                     ),
                   ),
+
+                  const SizedBox(height: 16),
+
+                  // App Version Footer
+                  const Text(
+                    'BeresApp v2.4.0\nSolusi Cepat & Andal Perbaikan Rumah Anda',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textMuted,
+                      height: 1.4,
+                    ),
+                  ),
+
+                  const SizedBox(height: 36),
                 ],
               ),
             ),
           ],
         ),
+      ],
+    ),
+  ),
+),
+SliverFillRemaining(
+  hasScrollBody: false,
+  fillOverscroll: false,
+  child: Container(color: bodyColor),
+),
+],
+),
+],
+),
+),
+);
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 8),
+      child: Row(
+        children: [
+          Container(
+            width: 3.5,
+            height: 14,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.6,
+              color: AppColors.textMuted,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -177,16 +737,20 @@ class UserProfilePage extends StatelessWidget {
     required Color iconColor,
     required String title,
     required String subtitle,
+    String? badgeText,
+    Color? badgeColor,
+    Widget? trailingWidget,
     required VoidCallback onTap,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
@@ -196,95 +760,69 @@ class UserProfilePage extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         clipBehavior: Clip.antiAlias,
         child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 2,
+          ),
           leading: Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(9),
             decoration: BoxDecoration(
               color: iconBg,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: iconColor, size: 22),
+            child: Icon(icon, color: iconColor, size: 20),
           ),
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textDark)),
-          subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-          trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 20),
+          title: Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: AppColors.textDark,
+            ),
+          ),
+          subtitle: Text(
+            subtitle,
+            style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: trailingWidget ??
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (badgeText != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: (badgeColor ?? AppColors.primary).withValues(
+                          alpha: 0.12,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        badgeText,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: badgeColor ?? AppColors.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  const Icon(
+                    Icons.chevron_right,
+                    color: AppColors.textMuted,
+                    size: 18,
+                  ),
+                ],
+              ),
           onTap: onTap,
         ),
       ),
-    );
-  }
-
-  void _showAddressModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Alamat Tersimpan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.home, color: AppColors.primary),
-                title: const Text('Rumah (Utama)', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Jl. Wijaya II No. 18, Kebayoran Baru, Jakarta Selatan'),
-                trailing: const Icon(Icons.check_circle, color: AppColors.successGreen),
-                onTap: () => Navigator.pop(context),
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.work, color: AppColors.textMuted),
-                title: const Text('Kantor'),
-                subtitle: const Text('Gedung Menara Mandiri Lt. 12, Jl. Jend. Sudirman'),
-                onTap: () => Navigator.pop(context),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.add_location_alt, color: Colors.white),
-                  label: const Text('Tambah Alamat Baru', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialogCtx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Konfirmasi Keluar', style: TextStyle(fontWeight: FontWeight.bold)),
-          content: const Text('Apakah Anda yakin ingin keluar dari akun Beres?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('Batal', style: TextStyle(color: AppColors.textMuted)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(dialogCtx);
-                context.read<AuthBloc>().add(SignOutRequestedEvent());
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.dangerRed),
-              child: const Text('Keluar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        );
-      },
     );
   }
 }
