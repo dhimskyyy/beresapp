@@ -205,9 +205,13 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: true,
+      canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        // Results can be retrieved by caller if needed
+        if (didPop) return;
+        Navigator.pop(context, {
+          'push': _pushNotification,
+          'whatsapp': _whatsappNotification,
+        });
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),

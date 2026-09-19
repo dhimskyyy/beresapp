@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -115,22 +116,43 @@ class UserBottomNavWrapper extends StatefulWidget {
 
 class _UserBottomNavWrapperState extends State<UserBottomNavWrapper> {
   int _selectedIndex = 0;
+  late UserModel _currentUser;
 
   @override
   void initState() {
     super.initState();
-    context.read<TicketBloc>().add(FetchUserTicketsEvent(widget.user.id));
+    _currentUser = widget.user;
+    context.read<TicketBloc>().add(FetchUserTicketsEvent(_currentUser.id));
+  }
+
+  @override
+  void didUpdateWidget(UserBottomNavWrapper oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.user != oldWidget.user) {
+      setState(() {
+        _currentUser = widget.user;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final pages = [
-      UserHomePage(user: widget.user, onNavigateToTicket: () => setState(() => _selectedIndex = 1)),
-      UserTicketsPage(user: widget.user),
-      UserChatListPage(user: widget.user),
+      UserHomePage(
+        user: _currentUser,
+        onNavigateToTicket: () => setState(() => _selectedIndex = 1),
+        onNavigateToProfile: () => setState(() => _selectedIndex = 3),
+      ),
+      UserTicketsPage(user: _currentUser),
+      UserChatListPage(user: _currentUser),
       UserProfilePage(
-        user: widget.user,
+        user: _currentUser,
         onNavigateToOrders: () => setState(() => _selectedIndex = 1),
+        onUserUpdated: (updatedUser) {
+          setState(() {
+            _currentUser = updatedUser;
+          });
+        },
       ),
     ];
 
@@ -177,8 +199,14 @@ class _UserBottomNavWrapperState extends State<UserBottomNavWrapper> {
 class UserHomePage extends StatelessWidget {
   final UserModel user;
   final VoidCallback onNavigateToTicket;
+  final VoidCallback? onNavigateToProfile;
 
-  const UserHomePage({super.key, required this.user, required this.onNavigateToTicket});
+  const UserHomePage({
+    super.key,
+    required this.user,
+    required this.onNavigateToTicket,
+    this.onNavigateToProfile,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -239,41 +267,68 @@ class UserHomePage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8),
-                      ],
-                    ),
-                    child: Stack(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.notifications_none_rounded, color: AppColors.textDark),
-                          onPressed: () => _showUserNotificationCenter(context),
+                  Row(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8),
+                          ],
                         ),
-                        Positioned(
-                          right: 8,
-                          top: 8,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: AppColors.dangerRed,
-                              shape: BoxShape.circle,
+                        child: Stack(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.notifications_none_rounded, color: AppColors.textDark),
+                              onPressed: () => _showUserNotificationCenter(context),
                             ),
-                          ),
+                            Positioned(
+                              right: 8,
+                              top: 8,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.dangerRed,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: onNavigateToProfile,
+                        child: CircleAvatar(
+                          radius: 19,
+                          backgroundColor: AppColors.primary,
+                          backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty
+                              ? (user.photoUrl!.startsWith('http')
+                                  ? NetworkImage(user.photoUrl!) as ImageProvider
+                                  : FileImage(File(user.photoUrl!)))
+                              : null,
+                          child: (user.photoUrl == null || user.photoUrl!.isEmpty)
+                              ? Text(
+                                  user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
 
               const SizedBox(height: 20),
 
-              // Hero Promotional & Guarantee Card
+              // Service Banner Card
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -300,7 +355,7 @@ class UserHomePage extends StatelessWidget {
                               color: AppColors.safetyAmber,
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Text('GARANSI 7 HARI', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.textDark)),
+                            child: const Text('LAYANAN TERPERCAYA', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.textDark)),
                           ),
                           const SizedBox(height: 8),
                           const Text(
@@ -790,6 +845,7 @@ class UserChatListPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text('Pesan & Chat', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         backgroundColor: AppColors.primary,
@@ -799,14 +855,35 @@ class UserChatListPage extends StatelessWidget {
       body: BlocBuilder<TicketBloc, TicketState>(
         builder: (context, state) {
           if (state is! TicketListLoadedState || state.tickets.isEmpty) {
-            return const Center(child: Text('Belum ada percakapan.'));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.chat_bubble_outline_rounded, size: 64, color: AppColors.textMuted),
+                  const SizedBox(height: 12),
+                  const Text('Belum Ada Percakapan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 4),
+                  const Text('Percakapan dengan tukang akan otomatis muncul di sini saat pesanan aktif.', style: TextStyle(color: AppColors.textMuted, fontSize: 12), textAlign: TextAlign.center),
+                ],
+              ),
+            );
           }
 
-          final ticket = state.tickets.first;
-          return ListView(
+          final tickets = state.tickets;
+          return ListView.builder(
             padding: const EdgeInsets.all(16),
-            children: [
-              Container(
+            itemCount: tickets.length,
+            itemBuilder: (context, idx) {
+              final ticket = tickets[idx];
+              final tradesmanName = ticket.selectedTukangName ?? 'Mitra (${ticket.category.toUpperCase()})';
+              final lastMsg = ticket.status == TicketStatus.completed
+                  ? 'Pekerjaan telah selesai. Terima kasih!'
+                  : (ticket.status == TicketStatus.inProgress
+                      ? 'Tukang sedang mengerjakan pesanan...'
+                      : 'Tiket aktif: ${ticket.title}');
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8)],
@@ -817,19 +894,31 @@ class UserChatListPage extends StatelessWidget {
                   clipBehavior: Clip.antiAlias,
                   child: ListTile(
                     contentPadding: const EdgeInsets.all(12),
-                    leading: const CircleAvatar(
+                    leading: CircleAvatar(
                       radius: 24,
                       backgroundColor: AppColors.primaryLight,
-                      child: Icon(Icons.engineering, color: Colors.white),
+                      child: Icon(
+                        ServiceCategories.getIconForCategory(ticket.category),
+                        color: Colors.white,
+                      ),
                     ),
-                    title: const Text('Pak Budi (Tukang AC)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    subtitle: const Text('Saya sudah dalam perjalanan ke lokasi Pak...', style: TextStyle(fontSize: 12, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    trailing: const Column(
+                    title: Text(tradesmanName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: Text(lastMsg, style: const TextStyle(fontSize: 12, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    trailing: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text('10:42', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
-                        SizedBox(height: 4),
-                        CircleAvatar(radius: 8, backgroundColor: AppColors.dangerRed, child: Text('1', style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold))),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            ticket.status.label,
+                            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.primary),
+                          ),
+                        ),
                       ],
                     ),
                     onTap: () {
@@ -846,8 +935,8 @@ class UserChatListPage extends StatelessWidget {
                     },
                   ),
                 ),
-              ),
-            ],
+              );
+            },
           );
         },
       ),

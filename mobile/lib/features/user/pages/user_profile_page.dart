@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -17,11 +18,13 @@ import 'user_wallet_page.dart';
 class UserProfilePage extends StatefulWidget {
   final UserModel user;
   final VoidCallback? onNavigateToOrders;
+  final ValueChanged<UserModel>? onUserUpdated;
 
   const UserProfilePage({
     super.key,
     required this.user,
     this.onNavigateToOrders,
+    this.onUserUpdated,
   });
 
   @override
@@ -36,6 +39,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   late String _userName;
   late String _userPhone;
+  String? _userPhotoUrl;
   late List<UserSavedAddress> _savedAddresses;
 
   @override
@@ -45,6 +49,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
     _userPhone = widget.user.phone.isNotEmpty
         ? widget.user.phone
         : '081234567890';
+    _userPhotoUrl = widget.user.photoUrl;
 
     _savedAddresses = [
       UserSavedAddress(
@@ -72,6 +77,18 @@ class _UserProfilePageState extends State<UserProfilePage> {
         longitude: 106.8080,
       ),
     ];
+  }
+
+  @override
+  void didUpdateWidget(UserProfilePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.user != oldWidget.user) {
+      setState(() {
+        _userName = widget.user.name.isNotEmpty ? widget.user.name : _userName;
+        _userPhone = widget.user.phone.isNotEmpty ? widget.user.phone : _userPhone;
+        _userPhotoUrl = widget.user.photoUrl;
+      });
+    }
   }
 
   String _formatCurrency(double amount) {
@@ -111,14 +128,29 @@ class _UserProfilePageState extends State<UserProfilePage> {
           currentName: _userName,
           currentPhone: _userPhone,
           email: widget.user.email,
+          currentPhotoUrl: _userPhotoUrl,
         ),
       ),
     ).then((result) {
       if (result is Map) {
+        final newName = result['name'] ?? _userName;
+        final newPhone = result['phone'] ?? _userPhone;
+        final newPhotoUrl = result['photoUrl'] as String?;
+
         setState(() {
-          _userName = result['name'] ?? _userName;
-          _userPhone = result['phone'] ?? _userPhone;
+          _userName = newName;
+          _userPhone = newPhone;
+          _userPhotoUrl = newPhotoUrl;
         });
+
+        final updatedUser = widget.user.copyWith(
+          name: newName,
+          phone: newPhone,
+          photoUrl: newPhotoUrl,
+        );
+
+        widget.onUserUpdated?.call(updatedUser);
+        context.read<AuthBloc>().add(UserProfileUpdatedEvent(updatedUser));
       }
     });
   }
@@ -273,9 +305,11 @@ class _UserProfilePageState extends State<UserProfilePage> {
               ],
             ),
 
-            CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
+            ScrollConfiguration(
+              behavior: const ScrollBehavior().copyWith(overscroll: false),
+              child: CustomScrollView(
+                physics: const ClampingScrollPhysics(),
+                slivers: [
                 // Modern Decorated Sliver AppBar & Profile Header
                 SliverToBoxAdapter(
                   child: Container(
@@ -382,16 +416,23 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                 child: CircleAvatar(
                                   radius: 42,
                                   backgroundColor: const Color(0xFF1E293B),
-                                  child: Text(
-                                    _userName.isNotEmpty
-                                        ? _userName[0].toUpperCase()
-                                        : 'U',
-                                    style: const TextStyle(
-                                      fontSize: 34,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                  backgroundImage: _userPhotoUrl != null && _userPhotoUrl!.isNotEmpty
+                                      ? (_userPhotoUrl!.startsWith('http')
+                                          ? NetworkImage(_userPhotoUrl!) as ImageProvider
+                                          : FileImage(File(_userPhotoUrl!)))
+                                      : null,
+                                  child: (_userPhotoUrl == null || _userPhotoUrl!.isEmpty)
+                                      ? Text(
+                                          _userName.isNotEmpty
+                                              ? _userName[0].toUpperCase()
+                                              : 'U',
+                                          style: const TextStyle(
+                                            fontSize: 34,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
+                                      : null,
                                 ),
                               ),
                               GestureDetector(
@@ -696,6 +737,7 @@ SliverFillRemaining(
   child: Container(color: bodyColor),
 ),
 ],
+),
 ),
 ],
 ),

@@ -17,6 +17,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<TukangRegisterRequestedEvent>(_onTukangRegister);
     on<TukangGoogleSignInRequestedEvent>(_onTukangGoogleSignIn);
     on<SignOutRequestedEvent>(_onSignOut);
+    on<UserProfileUpdatedEvent>((event, emit) {
+      emit(UserAuthenticatedState(event.user));
+    });
   }
 
   Future<void> _onCheckAuthStatus(CheckAuthStatusEvent event, Emitter<AuthState> emit) async {

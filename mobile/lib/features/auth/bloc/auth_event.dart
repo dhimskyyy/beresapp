@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../../data/models/tukang_model.dart';
+import '../../../data/models/user_model.dart';
 
 abstract class AuthEvent extends Equatable {
   const AuthEvent();
@@ -72,3 +73,10 @@ class TukangRegisterRequestedEvent extends AuthEvent {
 class TukangGoogleSignInRequestedEvent extends AuthEvent {}
 
 class SignOutRequestedEvent extends AuthEvent {}
+ 
+class UserProfileUpdatedEvent extends AuthEvent {
+  final UserModel user;
+  const UserProfileUpdatedEvent(this.user);
+  @override
+  List<Object?> get props => [user];
+}
