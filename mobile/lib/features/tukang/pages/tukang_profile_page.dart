@@ -505,7 +505,7 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Bantuan & Dukungan Mitra 24/7', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text('Bantuan & Dukungan 24/7', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             const Text('Tim Support Beres siap membantu kendala operasional Anda.', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
             const SizedBox(height: 16),
