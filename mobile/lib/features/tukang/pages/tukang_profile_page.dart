@@ -512,8 +512,8 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
 
             ListTile(
               leading: const CircleAvatar(backgroundColor: Color(0xFFDCFCE7), child: Icon(Icons.chat, color: AppColors.successGreen)),
-              title: const Text('Chat WhatsApp CS Mitra', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('+62 812-3456-7890 (Respon Cepat 24 Jam)'),
+              title: const Text('Chat WhatsApp CS', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('+62 852-5669-4929 (WA 24/7)', style: TextStyle(fontSize: 12)),
               onTap: () {
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Membuka chat CS WhatsApp...')));
@@ -523,7 +523,7 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
             ListTile(
               leading: const CircleAvatar(backgroundColor: Color(0xFFEFF6FF), child: Icon(Icons.phone, color: AppColors.primary)),
               title: const Text('Call Center Beres', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('1500-BERES ( Bebas Pulsa )'),
+              subtitle: const Text('+62 852-5669-4929', style: TextStyle(fontSize: 12)),
               onTap: () {
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Memanggil Call Center Beres...')));

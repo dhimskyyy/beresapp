@@ -365,7 +365,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               const Text(
-                                'Profil Akun',
+                                'Profil',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 20,

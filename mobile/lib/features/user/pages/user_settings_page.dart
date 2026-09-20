@@ -347,52 +347,8 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                 ],
               ),
             ),
-
             const SizedBox(height: 20),
-
-            // Section 3: Informasi Aplikasi
-            _buildSectionHeader('INFORMASI APLIKASI'),
-            Material(
-              color: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: AppColors.border),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.info_outline, color: AppColors.textMuted, size: 20),
-                    ),
-                    title: const Text(
-                      'Versi Aplikasi',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textDark),
-                    ),
-                    subtitle: const Text(
-                      'BeresApp Platform v2.4.0 (Stable)',
-                      style: TextStyle(fontSize: 11, color: AppColors.textMuted),
-                    ),
-                    trailing: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.successGreen.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        'Up to Date',
-                        style: TextStyle(color: AppColors.successGreen, fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                        
           ],
         ),
       ),

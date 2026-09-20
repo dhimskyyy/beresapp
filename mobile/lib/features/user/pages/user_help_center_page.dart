@@ -296,7 +296,7 @@ class _UserHelpCenterPageState extends State<UserHelpCenterPage> {
                         ),
                         const SizedBox(height: 2),
                         const Text(
-                          '+62 812-3456-7890',
+                          '+62 852-5669-4929',
                           style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                         ),
                         const SizedBox(height: 10),
@@ -361,7 +361,7 @@ class _UserHelpCenterPageState extends State<UserHelpCenterPage> {
                         ),
                         const SizedBox(height: 2),
                         const Text(
-                          '1500-BERES (Bebas Pulsa)',
+                          '+62 852-5669-4929',
                           style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                         ),
                         const SizedBox(height: 10),
