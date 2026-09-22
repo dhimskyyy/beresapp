@@ -38,6 +38,9 @@ google-services.json
 GoogleService-Info.plist
 ios/Runner/GoogleService-Info.plist
 android/app/google-services.json
+firebase_options.dart
+lib/firebase_options.dart
+!lib/firebase_options.dart.example
 *.keystore
 *.jks
 *.p12

@@ -9,6 +9,9 @@
 google-services.json
 GoogleService-Info.plist
 doku_config.dart
+firebase_options.dart
+**/firebase_options.dart
+!**/firebase_options.dart.example
 **/android/app/google-services.json
 **/ios/Runner/GoogleService-Info.plist
 **/lib/core/constants/doku_config.dart
