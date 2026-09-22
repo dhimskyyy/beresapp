@@ -24,7 +24,7 @@ export default function Sidebar() {
     { to: '/', label: 'Ringkasan', icon: LayoutDashboard },
     { 
       to: '/kyc', 
-      label: 'Verifikasi KTP', 
+      label: 'Verifikasi Mitra', 
       icon: UserCheck, 
       badge: pendingKycCount > 0 ? pendingKycCount : null,
       badgeColor: 'bg-amber-500 text-white'

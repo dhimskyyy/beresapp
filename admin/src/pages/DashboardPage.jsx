@@ -41,7 +41,7 @@ export default function DashboardPage() {
       title: 'Mitra Tukang Terverifikasi',
       value: verifiedTukang,
       unit: 'mitra aktif',
-      change: `${pendingKyc.length} menunggu KYC`,
+      change: `${pendingKyc.length} menunggu Verifikasi`,
       trend: pendingKyc.length > 0 ? 'warning' : 'neutral',
       icon: Wrench,
       color: 'emerald'
@@ -83,7 +83,7 @@ export default function DashboardPage() {
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md shadow-blue-600/20 transition-all"
           >
             <UserCheck className="w-4 h-4" />
-            <span>Tinjau KTP ({pendingKyc.length})</span>
+            <span>Tinjau Mitra Baru ({pendingKyc.length})</span>
           </Link>
 
           <Link
@@ -145,13 +145,13 @@ export default function DashboardPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-slate-900 text-sm">Ada {pendingKyc.length} Calon Mitra Menunggu Verifikasi KTP</h3>
+                  <h3 className="font-bold text-slate-900 text-sm">Ada {pendingKyc.length} Calon Mitra Menunggu Verifikasi Pendaftaran</h3>
                   <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
                     Prioritas
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 mt-1">
-                  Mitra tukang baru belum bisa mengambil atau menawar order sebelum dokumen KTP diperiksa keabsahannya.
+                  Mitra tukang baru belum bisa mengambil atau menawar order sebelum keahlian dan nomor rekening payout diperiksa admin.
                 </p>
                 <div className="mt-3 flex items-center gap-3">
                   <Link

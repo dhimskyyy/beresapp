@@ -61,7 +61,9 @@ export const initialTukangList = [
     reviewCount: 0,
     totalJobsDone: 0,
     isOnline: false,
-    statusText: "Menunggu Verifikasi KTP",
+    statusText: "Menunggu Verifikasi Admin",
+    experienceYears: 7,
+    bio: "Spesialis bengkel las pagar, tralis, kanopi baja ringan, dan konstruksi bangunan rumah.",
     currentLocation: {
       lat: -6.1754,
       lng: 106.8272,
@@ -162,7 +164,9 @@ export const initialTukangList = [
     reviewCount: 0,
     totalJobsDone: 0,
     isOnline: false,
-    statusText: "Menunggu Verifikasi KTP",
+    statusText: "Menunggu Verifikasi Admin",
+    experienceYears: 5,
+    bio: "Ahli perpipaan air bersih/kotor, perbaikan pompa air, instalasi toren, dan kebocoran.",
     currentLocation: {
       lat: -6.2412,
       lng: 106.7995,
