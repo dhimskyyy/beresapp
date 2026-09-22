@@ -72,6 +72,105 @@ class TicketRepositoryImpl implements TicketRepository {
       createdAt: DateTime.now().subtract(const Duration(hours: 1)),
       updatedAt: DateTime.now().subtract(const Duration(minutes: 40)),
     ),
+    TicketModel(
+      id: 'TCK-800',
+      userId: 'USR-001',
+      userName: 'Siti Rahmawati',
+      category: 'ac',
+      title: 'Servis AC & Cuci Besar Ruang Tamu',
+      description: 'AC 2 PK kotor dan tidak dingin, tolong dicuci total dan cek tekanan gas freon.',
+      photoUrls: ['https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=600'],
+      address: 'Jl. Wijaya II No. 18, Kebayoran Baru, Jakarta Selatan',
+      lat: -6.2382,
+      lng: 106.8123,
+      status: TicketStatus.completed,
+      selectedTukangId: 'TKG-001',
+      selectedTukangName: 'Ahmad Subarjo',
+      bids: [
+        BidModel(
+          tukangId: 'TKG-001',
+          tukangName: 'Ahmad Subarjo',
+          tukangPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+          tukangRating: 5.0,
+          estimatedPrice: 220000,
+          note: 'Bawa tangga aluminium dan mesin cuci bertekanan.',
+          createdAt: DateTime.now().subtract(const Duration(days: 2)),
+        ),
+      ],
+      finalBill: FinalBill(
+        items: [
+          BillItem(title: 'Cuci Steam AC 2 PK', amount: 95000),
+          BillItem(title: 'Tambah Freon R32', amount: 130000),
+        ],
+        totalAmount: 225000,
+        approvedByUser: true,
+        createdAt: DateTime.now().subtract(const Duration(days: 2, hours: 3)),
+      ),
+      ratingStars: 5,
+      ratingReview: 'Pelayanan sangat ramah, pengerjaan cepat dan bersih! AC langsung dingin semriwing.',
+      beforePhotos: ['https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600'],
+      afterPhotos: ['https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=600'],
+      createdAt: DateTime.now().subtract(const Duration(days: 2, hours: 5)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 2)),
+    ),
+    TicketModel(
+      id: 'TCK-799',
+      userId: 'USR-003',
+      userName: 'Hendra Gunawan',
+      category: 'plumbing',
+      title: 'Ganti Kran Wastafel & Perbaikan Pipa Bocor',
+      description: 'Kran patah dan pipa bawah wastafel bocor membasahi kabinet.',
+      photoUrls: ['https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=600'],
+      address: 'Cluster Menteng Indah Blok C3 No. 5, Jakarta Selatan',
+      lat: -6.2215,
+      lng: 106.8250,
+      status: TicketStatus.completed,
+      selectedTukangId: 'TKG-001',
+      selectedTukangName: 'Ahmad Subarjo',
+      bids: [
+        BidModel(
+          tukangId: 'TKG-001',
+          tukangName: 'Ahmad Subarjo',
+          tukangPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+          tukangRating: 4.8,
+          estimatedPrice: 160000,
+          note: 'Siap ganti seal dan kran fleksibel baru.',
+          createdAt: DateTime.now().subtract(const Duration(days: 5)),
+        ),
+      ],
+      finalBill: FinalBill(
+        items: [
+          BillItem(title: 'Jasa Pemasangan & Bongkar Kran', amount: 80000),
+          BillItem(title: 'Kran Wastafel Fleksibel Stainless', amount: 95000),
+        ],
+        totalAmount: 175000,
+        approvedByUser: true,
+        createdAt: DateTime.now().subtract(const Duration(days: 5, hours: 2)),
+      ),
+      ratingStars: 5,
+      ratingReview: 'Tukang datang tepat waktu, bawa alat komplit, pipa tidak bocor lagi.',
+      createdAt: DateTime.now().subtract(const Duration(days: 5, hours: 4)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 5)),
+    ),
+    TicketModel(
+      id: 'TCK-798',
+      userId: 'USR-004',
+      userName: 'Rina Kartika',
+      category: 'electricity',
+      title: 'MCB Listrik Sering Jeglek Tiba-Tiba',
+      description: 'Setiap menyalakan oven dan dispenser MCB meteran langsung turun.',
+      photoUrls: ['https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=600'],
+      address: 'Jl. Radio Dalam Raya No. 45, Jakarta Selatan',
+      lat: -6.2550,
+      lng: 106.7900,
+      status: TicketStatus.canceled,
+      selectedTukangId: 'TKG-001',
+      selectedTukangName: 'Ahmad Subarjo',
+      bids: [],
+      cancelReason: 'Dibatalkan konsumen sebelum mitra berangkat',
+      createdAt: DateTime.now().subtract(const Duration(days: 7)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 7)),
+    ),
   ];
 
   @override
@@ -436,5 +535,48 @@ class TicketRepositoryImpl implements TicketRepository {
     } catch (_) {
       return null;
     }
+  }
+
+  @override
+  Future<TicketModel> submitRatingReview({
+    required String ticketId,
+    required int stars,
+    required String review,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    final index = _mockTickets.indexWhere((t) => t.id == ticketId);
+    if (index == -1) throw Exception('Ticket $ticketId not found');
+
+    final old = _mockTickets[index];
+    final updated = TicketModel(
+      id: old.id,
+      userId: old.userId,
+      userName: old.userName,
+      category: old.category,
+      title: old.title,
+      description: old.description,
+      photoUrls: old.photoUrls,
+      address: old.address,
+      lat: old.lat,
+      lng: old.lng,
+      status: old.status,
+      selectedTukangId: old.selectedTukangId,
+      selectedTukangName: old.selectedTukangName,
+      bids: old.bids,
+      finalBill: old.finalBill,
+      beforePhotos: old.beforePhotos,
+      afterPhotos: old.afterPhotos,
+      paymentMethod: old.paymentMethod,
+      paymentStatus: old.paymentStatus,
+      dokuInvoiceId: old.dokuInvoiceId,
+      ratingStars: stars,
+      ratingReview: review,
+      cancelReason: old.cancelReason,
+      createdAt: old.createdAt,
+      updatedAt: DateTime.now(),
+    );
+
+    _mockTickets[index] = updated;
+    return updated;
   }
 }

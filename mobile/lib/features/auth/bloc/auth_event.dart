@@ -80,3 +80,10 @@ class UserProfileUpdatedEvent extends AuthEvent {
   @override
   List<Object?> get props => [user];
 }
+
+class TukangProfileUpdatedEvent extends AuthEvent {
+  final TukangModel tukang;
+  const TukangProfileUpdatedEvent(this.tukang);
+  @override
+  List<Object?> get props => [tukang];
+}

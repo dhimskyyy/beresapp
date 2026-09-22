@@ -155,3 +155,18 @@ class FetchTukangActiveTicketsEvent extends TicketEvent {
   @override
   List<Object?> get props => [tukangId];
 }
+
+class SubmitRatingReviewRequestedEvent extends TicketEvent {
+  final String ticketId;
+  final int stars;
+  final String review;
+
+  const SubmitRatingReviewRequestedEvent({
+    required this.ticketId,
+    required this.stars,
+    required this.review,
+  });
+
+  @override
+  List<Object?> get props => [ticketId, stars, review];
+}

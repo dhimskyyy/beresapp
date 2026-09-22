@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/constants/app_colors.dart';
+import 'data/models/ticket_model.dart';
 import 'data/models/tukang_model.dart';
 import 'data/repositories/auth_repository_impl.dart';
 import 'data/repositories/chat_repository_impl.dart';
@@ -18,7 +19,9 @@ import 'features/ticket/bloc/ticket_bloc.dart';
 import 'features/ticket/bloc/ticket_event.dart';
 import 'features/ticket/bloc/ticket_state.dart';
 import 'features/tukang/pages/mitra_active_job_page.dart';
+import 'features/tukang/pages/mitra_chat_list_page.dart';
 import 'features/tukang/pages/mitra_job_feed_page.dart';
+import 'features/tukang/pages/mitra_job_history_page.dart';
 import 'features/tukang/pages/tukang_profile_page.dart';
 
 void main() {
@@ -93,54 +96,6 @@ class MitraMainRouter extends StatelessWidget {
       builder: (context, state) {
         if (state is TukangAuthenticatedState) {
           final t = state.tukang;
-
-          if (t.verificationStatus != 'verified') {
-            return Scaffold(
-              appBar: AppBar(
-                title: const Text('Status Verifikasi KTP'),
-                backgroundColor: AppColors.textDark,
-                foregroundColor: Colors.white,
-              ),
-              body: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Center(
-                  child: Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.hourglass_top_rounded, size: 64, color: AppColors.safetyAmber),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Dokumen KTP Sedang Ditinjau Admin',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Halo ${t.name}. KTP dan data keahlian (${t.services.join(', ')}) Anda sedang diperiksa oleh Admin Beres.',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-                          ),
-                          const SizedBox(height: 24),
-                          ElevatedButton(
-                            onPressed: () {
-                              context.read<AuthBloc>().add(SignOutRequestedEvent());
-                            },
-                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.textDark),
-                            child: const Text('Keluar', style: TextStyle(color: Colors.white)),
-                          )
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }
-
           return MitraBottomNavWrapper(tukang: t);
         }
 
@@ -170,7 +125,7 @@ class _MitraBottomNavWrapperState extends State<MitraBottomNavWrapper> {
   Widget _buildNavIcon(IconData unselectedIcon, IconData selectedIcon, int index) {
     final isSelected = _selectedIndex == index;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: isSelected ? AppColors.textDark.withValues(alpha: 0.12) : Colors.transparent,
         borderRadius: BorderRadius.circular(16),
@@ -178,7 +133,7 @@ class _MitraBottomNavWrapperState extends State<MitraBottomNavWrapper> {
       child: Icon(
         isSelected ? selectedIcon : unselectedIcon,
         color: isSelected ? AppColors.textDark : AppColors.textMuted,
-        size: isSelected ? 24 : 22,
+        size: isSelected ? 23 : 21,
       ),
     );
   }
@@ -189,35 +144,11 @@ class _MitraBottomNavWrapperState extends State<MitraBottomNavWrapper> {
       builder: (context, state) {
         final pages = [
           MitraJobFeedPage(tukang: widget.tukang),
-          BlocBuilder<TicketBloc, TicketState>(
-            builder: (context, tState) {
-              if (tState is TicketListLoadedState && tState.tickets.isNotEmpty) {
-                final active = tState.tickets.first;
-                return MitraActiveJobPage(ticket: active, tukang: widget.tukang);
-              }
-              return Scaffold(
-                appBar: AppBar(title: const Text('Pengerjaan Aktif'), backgroundColor: AppColors.textDark, foregroundColor: Colors.white),
-                body: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.engineering_outlined, size: 64, color: AppColors.textMuted),
-                      const SizedBox(height: 12),
-                      const Text('Belum Ada Pengerjaan Aktif', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      const SizedBox(height: 4),
-                      const Text('Silakan ajukan penawaran pada tab Radar Job.', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () => setState(() => _selectedIndex = 0),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.textDark),
-                        child: const Text('Buka Radar Job', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+          MitraWorkManagementPage(
+            tukang: widget.tukang,
+            onGoToRadar: () => setState(() => _selectedIndex = 0),
           ),
+          MitraChatListPage(tukang: widget.tukang),
           TukangWalletPage(tukang: widget.tukang),
           TukangProfilePage(tukang: widget.tukang),
         ];
@@ -242,8 +173,8 @@ class _MitraBottomNavWrapperState extends State<MitraBottomNavWrapper> {
               currentIndex: _selectedIndex,
               selectedItemColor: AppColors.textDark,
               unselectedItemColor: AppColors.textMuted,
-              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
-              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
+              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11),
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 10),
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.white,
               elevation: 0,
@@ -258,11 +189,15 @@ class _MitraBottomNavWrapperState extends State<MitraBottomNavWrapper> {
                   label: 'Pengerjaan',
                 ),
                 BottomNavigationBarItem(
-                  icon: _buildNavIcon(Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, 2),
+                  icon: _buildNavIcon(Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 2),
+                  label: 'Chat',
+                ),
+                BottomNavigationBarItem(
+                  icon: _buildNavIcon(Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, 3),
                   label: 'Dompet',
                 ),
                 BottomNavigationBarItem(
-                  icon: _buildNavIcon(Icons.person_outline_rounded, Icons.person_rounded, 3),
+                  icon: _buildNavIcon(Icons.person_outline_rounded, Icons.person_rounded, 4),
                   label: 'Profil',
                 ),
               ],
@@ -273,3 +208,152 @@ class _MitraBottomNavWrapperState extends State<MitraBottomNavWrapper> {
     );
   }
 }
+
+class MitraWorkManagementPage extends StatefulWidget {
+  final TukangModel tukang;
+  final VoidCallback onGoToRadar;
+  const MitraWorkManagementPage({super.key, required this.tukang, required this.onGoToRadar});
+
+  @override
+  State<MitraWorkManagementPage> createState() => _MitraWorkManagementPageState();
+}
+
+class _MitraWorkManagementPageState extends State<MitraWorkManagementPage> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<TicketBloc, TicketState>(
+      builder: (context, tState) {
+        TicketModel? activeTicket;
+        if (tState is TicketListLoadedState && tState.tickets.isNotEmpty) {
+          // Find first in-flight ticket (not completed and not canceled)
+          try {
+            activeTicket = tState.tickets.firstWhere((t) => t.status.isActive);
+          } catch (_) {
+            activeTicket = null;
+          }
+        }
+
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: AppColors.textDark,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            title: const Text('Manajemen Pengerjaan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            bottom: TabBar(
+              controller: _tabController,
+              indicatorColor: AppColors.safetyAmber,
+              indicatorWeight: 3,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white70,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              tabs: const [
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.play_circle_outline, size: 16),
+                      SizedBox(width: 6),
+                      Text('Pekerjaan Aktif'),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.history_rounded, size: 16),
+                      SizedBox(width: 6),
+                      Text('Riwayat Selesai'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              // Tab 1: Active Job
+              activeTicket != null
+                  ? MitraActiveJobPage(ticket: activeTicket, tukang: widget.tukang)
+                  : Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: AppColors.textDark.withValues(alpha: 0.08),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.engineering_outlined, size: 56, color: AppColors.textDark),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Belum Ada Pengerjaan Aktif',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: AppColors.textDark),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Silakan ajukan penawaran harga pada tab Radar Job untuk mengambil pesanan baru.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                            ),
+                            const SizedBox(height: 20),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed: widget.onGoToRadar,
+                                  icon: const Icon(Icons.radar, size: 18, color: Colors.white),
+                                  label: const Text('Buka Radar Job', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.textDark,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                OutlinedButton.icon(
+                                  onPressed: () => _tabController.animateTo(1),
+                                  icon: const Icon(Icons.history, size: 18, color: AppColors.textDark),
+                                  label: const Text('Lihat Riwayat', style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold)),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    side: const BorderSide(color: AppColors.border),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+              // Tab 2: History
+              MitraJobHistoryPage(tukang: widget.tukang),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+

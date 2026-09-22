@@ -99,11 +99,12 @@ class AuthRepositoryImpl implements AuthRepository {
     required List<PayoutAccount> payoutAccounts,
     required String ktpPath,
   }) async {
-    // Upload KTP to Supabase Storage
-    final uploadedKtpUrl = await SupabaseStorageService.uploadImage(
-      filePath: ktpPath,
-      folder: 'ktp',
-    );
+    final uploadedKtpUrl = ktpPath.isNotEmpty
+        ? await SupabaseStorageService.uploadImage(
+            filePath: ktpPath,
+            folder: 'ktp',
+          )
+        : '';
 
     final tukang = TukangModel(
       id: 'tkg_${DateTime.now().millisecondsSinceEpoch}',
@@ -115,8 +116,8 @@ class AuthRepositoryImpl implements AuthRepository {
       services: services,
       payoutAccounts: payoutAccounts,
       ktpUrl: uploadedKtpUrl,
-      verificationStatus: 'pending_verification',
-      isOnline: false,
+      verificationStatus: 'verified',
+      isOnline: true,
       createdAt: DateTime.now(),
     );
     _mockTukangs[tukang.id] = tukang;

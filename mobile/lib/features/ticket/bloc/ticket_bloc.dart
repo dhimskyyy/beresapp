@@ -17,6 +17,7 @@ class TicketBloc extends Bloc<TicketEvent, TicketState> {
     on<UploadWorkPhotosRequestedEvent>(_onUploadWorkPhotos);
     on<FetchUserTicketsEvent>(_onFetchUserTickets);
     on<FetchTukangActiveTicketsEvent>(_onFetchTukangActiveTickets);
+    on<SubmitRatingReviewRequestedEvent>(_onSubmitRatingReview);
   }
 
   Future<void> _onCreateTicket(CreateTicketRequestedEvent event, Emitter<TicketState> emit) async {
@@ -155,6 +156,20 @@ class TicketBloc extends Bloc<TicketEvent, TicketState> {
       emit(TicketListLoadedState(list));
     } catch (e) {
       emit(TicketOperationFailureState('Gagal memuat tiket aktif tukang: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onSubmitRatingReview(SubmitRatingReviewRequestedEvent event, Emitter<TicketState> emit) async {
+    emit(TicketLoadingState());
+    try {
+      final updated = await ticketRepository.submitRatingReview(
+        ticketId: event.ticketId,
+        stars: event.stars,
+        review: event.review,
+      );
+      emit(TukangLockedSuccessState(updated));
+    } catch (e) {
+      emit(TicketOperationFailureState('Gagal mengirim ulasan: ${e.toString()}'));
     }
   }
 }

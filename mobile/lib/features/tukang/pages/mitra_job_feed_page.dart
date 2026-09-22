@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/service_categories.dart';
 import '../../../data/models/ticket_model.dart';
@@ -47,9 +51,9 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
   double _calculateDistanceInKm(double lat1, double lon1, double lat2, double lon2) {
     if (lat1 == 0.0 && lon1 == 0.0) return 2.4;
     const p = 0.017453292519943295;
-    final a = 0.5 - math.cos((lat2 - lat1) * p)/2 + 
-            math.cos(lat1 * p) * math.cos(lat2 * p) * 
-            (1 - math.cos((lon2 - lon1) * p))/2;
+    final a = 0.5 - math.cos((lat2 - lat1) * p) / 2 +
+        math.cos(lat1 * p) * math.cos(lat2 * p) *
+            (1 - math.cos((lon2 - lon1) * p)) / 2;
     final dist = 12742 * math.asin(math.sqrt(a));
     return dist < 0.5 ? 1.2 : dist;
   }
@@ -71,11 +75,14 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
     }
   }
 
-  /// 1-Click Instant Bidding
+  /// 1-Click Instant Bidding with feedback
   void _submitDirect1ClickBid(TicketModel ticket) {
     if (widget.tukang.isCurrentlySuspended) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Akun Anda sedang disuspend. Tidak dapat mengajukan penawaran.'), backgroundColor: AppColors.dangerRed),
+        const SnackBar(
+          content: Text('Akun Anda sedang disuspend. Tidak dapat mengajukan penawaran.'),
+          backgroundColor: AppColors.dangerRed,
+        ),
       );
       return;
     }
@@ -89,6 +96,87 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
         tukangRating: widget.tukang.rating,
         estimatedPrice: 0,
         note: 'Siap datang dan mengerjakan tiket ${ticket.category.toUpperCase()} Anda.',
+      ),
+    );
+  }
+
+  /// Helper safe image builder
+  Widget _buildSafeImage(String path, {double width = 64, double height = 64, double radius = 8}) {
+    Widget img;
+    if (path.startsWith('http')) {
+      img = Image.network(
+        path,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _fallbackImage(width, height),
+      );
+    } else if (path.startsWith('/')) {
+      final file = File(path);
+      if (file.existsSync()) {
+        img = Image.file(
+          file,
+          width: width,
+          height: height,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _fallbackImage(width, height),
+        );
+      } else {
+        img = _fallbackImage(width, height);
+      }
+    } else {
+      img = Image.asset(
+        path,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _fallbackImage(width, height),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: img,
+    );
+  }
+
+  Widget _fallbackImage(double w, double h) {
+    return Container(
+      width: w,
+      height: h,
+      color: Colors.grey.shade200,
+      child: const Icon(Icons.image_outlined, size: 22, color: AppColors.textMuted),
+    );
+  }
+
+  /// Fullscreen Image Viewer Modal
+  void _showImageViewer(BuildContext context, String path) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: const EdgeInsets.all(12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            InteractiveViewer(
+              minScale: 0.8,
+              maxScale: 4.0,
+              child: _buildSafeImage(path, width: double.infinity, height: 400, radius: 12),
+            ),
+            Positioned(
+              top: 12,
+              right: 12,
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -298,84 +386,141 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
     );
   }
 
-  /// Modal Bottom Sheet Detail Pekerjaan
+  /// Modernized Job Detail Bottom Sheet with Mini Map & Photo Gallery
   void _showJobDetailBottomSheet(BuildContext context, TicketModel ticket, double distance) {
     final isLockedByMe = ticket.status == TicketStatus.locked ||
         ticket.status == TicketStatus.onTheWay ||
+        ticket.status == TicketStatus.arrived ||
         ticket.status == TicketStatus.inProgress ||
         ticket.status == TicketStatus.workCompleted;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
         return Container(
-          height: MediaQuery.of(ctx).size.height * 0.85,
-          padding: const EdgeInsets.all(20),
+          height: MediaQuery.of(ctx).size.height * 0.88,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
+              // Top drag bar
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
+              ),
+
+              // Header bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgAC,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(ServiceCategories.getIconForCategory(ticket.category), size: 14, color: AppColors.primary),
+                          const SizedBox(width: 5),
+                          Text(ticket.category.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.primary)),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close_rounded),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.bgAC,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(ServiceCategories.getIconForCategory(ticket.category), size: 14, color: AppColors.primary),
-                        const SizedBox(width: 4),
-                        Text(ticket.category.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.primary)),
-                      ],
-                    ),
-                  ),                  
-                  IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(ticket.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textDark)),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Text('📍 ${distance.toStringAsFixed(1)} km dari lokasi Anda', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.successGreen)),
-                  const SizedBox(width: 8),
-                  Text('• Diposting: ${_formatTimeAgo(ticket.createdAt)}', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                ],
-              ),
-              const Divider(height: 24),
 
               Expanded(
                 child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(ticket.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textDark)),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.successGreen.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.location_on, size: 12, color: AppColors.successGreen),
+                                const SizedBox(width: 3),
+                                Text('📍 ${distance.toStringAsFixed(1)} km (~${(distance * 3).clamp(3, 60).round()} mnt)',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.successGreen)),
+                              ],
+                            ),
+                          ),
+                          Text('• Diposting ${_formatTimeAgo(ticket.createdAt)}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                        ],
+                      ),
+                      const Divider(height: 24),
+
                       // Deskripsi Pekerjaan
-                      const Text('Deskripsi Job:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textMuted)),
+                      const Text('Deskripsi Kendala Konsumen:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textMuted)),
                       const SizedBox(height: 6),
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: AppColors.background,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: AppColors.border),
                         ),
                         child: Text(ticket.description, style: const TextStyle(fontSize: 13, color: AppColors.textDark, height: 1.4)),
                       ),
                       const SizedBox(height: 16),
+
+                      // Foto Kendala Konsumen (Jika Ada)
+                      if (ticket.photoUrls.isNotEmpty) ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Foto Kendala (${ticket.photoUrls.length}):', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textMuted)),
+                            const Text('Ketuk untuk perbesar', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          height: 90,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: ticket.photoUrls.length,
+                            separatorBuilder: (context, index) => const SizedBox(width: 8),
+                            itemBuilder: (context, idx) {
+                              final imgPath = ticket.photoUrls[idx];
+                              return GestureDetector(
+                                onTap: () => _showImageViewer(context, imgPath),
+                                child: _buildSafeImage(imgPath, width: 90, height: 90, radius: 10),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
 
                       // Informasi Pelanggan & Alamat
                       const Text('Detail Pelanggan & Lokasi:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textMuted)),
@@ -384,7 +529,7 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: AppColors.border),
                         ),
                         child: Column(
@@ -392,20 +537,28 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                             Row(
                               children: [
                                 CircleAvatar(
-                                  radius: 16,
-                                  backgroundColor: AppColors.textDark,
+                                  radius: 18,
+                                  backgroundColor: AppColors.primary,
                                   child: Text(
                                     ticket.userName.isNotEmpty ? ticket.userName[0].toUpperCase() : 'U',
                                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                                   ),
                                 ),
                                 const SizedBox(width: 10),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(ticket.userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                    const Text('Pelanggan Beres App', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                                  ],
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(ticket.userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                      const Row(
+                                        children: [
+                                          Icon(Icons.verified, size: 12, color: AppColors.primary),
+                                          SizedBox(width: 3),
+                                          Text('Konsumen Terverifikasi Beres App', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
@@ -413,9 +566,20 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.place, color: AppColors.dangerRed, size: 18),
+                                const Icon(Icons.place_rounded, color: AppColors.dangerRed, size: 18),
                                 const SizedBox(width: 6),
                                 Expanded(child: Text(ticket.address, style: const TextStyle(fontSize: 12, color: AppColors.textDark))),
+                                IconButton(
+                                  icon: const Icon(Icons.copy_rounded, size: 16, color: AppColors.textMuted),
+                                  tooltip: 'Salin Alamat',
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () {
+                                    Clipboard.setData(ClipboardData(text: ticket.address));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Alamat berhasil disalin!'), duration: Duration(seconds: 1)),
+                                    );
+                                  },
+                                ),
                               ],
                             ),
                           ],
@@ -423,89 +587,139 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                       ),
                       const SizedBox(height: 16),
 
+                      // Mini Map Lokasi Pelanggan
+                      if (ticket.lat != 0.0 && ticket.lng != 0.0) ...[
+                        const Text('Peta Titik Lokasi Rumah:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textMuted)),
+                        const SizedBox(height: 6),
+                        Container(
+                          height: 140,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: FlutterMap(
+                            options: MapOptions(
+                              initialCenter: LatLng(ticket.lat, ticket.lng),
+                              initialZoom: 15.0,
+                              interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                userAgentPackageName: 'com.beres.beresapp',
+                              ),
+                              MarkerLayer(
+                                markers: [
+                                  Marker(
+                                    point: LatLng(ticket.lat, ticket.lng),
+                                    width: 40,
+                                    height: 40,
+                                    child: const Icon(Icons.location_on, color: AppColors.dangerRed, size: 36),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
                       // Status Stepper Progress Job
                       const Text('Progress Status Pekerjaan:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textMuted)),
                       const SizedBox(height: 8),
                       _buildProgressStepper(ticket.status),
+                      const SizedBox(height: 20),
                     ],
                   ),
                 ),
               ),
 
-              const SizedBox(height: 12),
               // Action Buttons: Chat & Mulai Pekerjaan
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ChatPage(
-                              ticket: ticket,
-                              currentUserId: widget.tukang.id,
-                              currentUserRole: 'tukang',
-                            ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18, color: AppColors.textDark),
-                      label: const Text('Chat User', style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold)),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.textDark, width: 1.5),
-                        minimumSize: const Size.fromHeight(46),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: isLockedByMe
-                          ? () {
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -4)),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
                               Navigator.pop(ctx);
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => MitraActiveJobPage(ticket: ticket, tukang: widget.tukang),
+                                  builder: (_) => ChatPage(
+                                    ticket: ticket,
+                                    currentUserId: widget.tukang.id,
+                                    currentUserRole: 'tukang',
+                                  ),
                                 ),
                               );
-                            }
-                          : null,
-                      icon: Icon(
-                        isLockedByMe ? Icons.play_arrow_rounded : Icons.lock_rounded,
-                        color: isLockedByMe ? Colors.white : AppColors.textMuted,
-                      ),
-                      label: Text(
-                        isLockedByMe ? 'Mulai' : 'Mulai',
-                        style: TextStyle(
-                          color: isLockedByMe ? Colors.white : AppColors.textMuted,
-                          fontWeight: FontWeight.bold,
+                            },
+                            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18, color: AppColors.textDark),
+                            label: const Text('Chat User', style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold)),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: AppColors.textDark, width: 1.5),
+                              minimumSize: const Size.fromHeight(46),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: isLockedByMe
+                                ? () {
+                                    Navigator.pop(ctx);
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => MitraActiveJobPage(ticket: ticket, tukang: widget.tukang),
+                                      ),
+                                    );
+                                  }
+                                : null,
+                            icon: Icon(
+                              isLockedByMe ? Icons.play_arrow_rounded : Icons.lock_rounded,
+                              color: isLockedByMe ? Colors.white : AppColors.textMuted,
+                            ),
+                            label: Text(
+                              isLockedByMe ? 'Buka Pengerjaan' : 'Mulai',
+                              style: TextStyle(
+                                color: isLockedByMe ? Colors.white : AppColors.textMuted,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.successGreen,
+                              disabledBackgroundColor: Colors.grey.shade300,
+                              minimumSize: const Size.fromHeight(46),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (!isLockedByMe)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          '🔒 Tombol "Buka Pengerjaan" aktif setelah User menyetujui Nota/Invoice Jasa di Room Chat.',
+                          style: TextStyle(fontSize: 10, color: AppColors.textMuted, fontStyle: FontStyle.italic),
+                          textAlign: TextAlign.center,
                         ),
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.successGreen,
-                        disabledBackgroundColor: Colors.grey.shade300,
-                        minimumSize: const Size.fromHeight(46),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (!isLockedByMe)
-                const Padding(
-                  padding: EdgeInsets.only(top: 6),
-                  child: Center(
-                    child: Text(
-                      '🔒 Tombol "Mulai Pekerjaan" terbuka setelah User menyetujui Nota/Invoice Jasa di Room Chat.',
-                      style: TextStyle(fontSize: 10, color: AppColors.textMuted, fontStyle: FontStyle.italic),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
+                  ],
                 ),
+              ),
             ],
           ),
         );
@@ -608,10 +822,10 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
           top: true,
           child: Column(
             children: [
-              // Modern Floating Box Header (Kartu Profil Tukang Terpisah)
+              // Modern Floating Box Header (Kartu Profil Tukang)
               Container(
                 width: double.infinity,
-                margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                margin: const EdgeInsets.fromLTRB(16, 12, 16, 10),
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
@@ -627,7 +841,7 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Profile Row & Icon Notifikasi
+                    // Profile Row & Notifikasi
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -665,43 +879,60 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                             ),
                           ],
                         ),
-                        // Icon Notifikasi dengan Badge Red Dot
-                        BlocBuilder<TicketBloc, TicketState>(
-                          builder: (context, state) {
-                            final radarTickets = state is TicketListLoadedState ? state.tickets : <TicketModel>[];
-                            return Stack(
-                              children: [
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.12),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: IconButton(
-                                    icon: const Icon(Icons.notifications_active_rounded, color: AppColors.safetyAmber),
-                                    onPressed: () => _showNotificationBottomSheet(context, radarTickets),
-                                    tooltip: 'Notifikasi Chat & Radar Job',
-                                  ),
-                                ),
-                                Positioned(
-                                  right: 6,
-                                  top: 6,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: const BoxDecoration(
-                                      color: AppColors.dangerRed,
-                                      shape: BoxShape.circle,
+                        // Refresh & Notifikasi Row
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: IconButton(
+                                icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+                                onPressed: _fetchRadar,
+                                tooltip: 'Segarkan Radar',
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            BlocBuilder<TicketBloc, TicketState>(
+                              builder: (context, state) {
+                                final radarTickets = state is TicketListLoadedState ? state.tickets : <TicketModel>[];
+                                return Stack(
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.12),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: IconButton(
+                                        icon: const Icon(Icons.notifications_active_rounded, color: AppColors.safetyAmber, size: 20),
+                                        onPressed: () => _showNotificationBottomSheet(context, radarTickets),
+                                        tooltip: 'Notifikasi Chat & Radar Job',
+                                      ),
                                     ),
-                                    child: const Text('2', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
+                                    Positioned(
+                                      right: 4,
+                                      top: 4,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: const BoxDecoration(
+                                          color: AppColors.dangerRed,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Text('2', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
 
                     // Quick Stats Cards Row
                     Row(
@@ -711,7 +942,7 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                             icon: Icons.star_rounded,
                             iconColor: AppColors.safetyAmber,
                             title: '${widget.tukang.rating}',
-                            subtitle: 'Rating Sempurna',
+                            subtitle: 'Rating Mitra',
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -720,7 +951,7 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                             icon: Icons.radar_rounded,
                             iconColor: AppColors.primaryLight,
                             title: '${widget.tukang.workRadiusKm.toInt()} km',
-                            subtitle: 'Radius GPS',
+                            subtitle: 'Radius Pantau',
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -728,8 +959,8 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                           child: _buildQuickStatTile(
                             icon: Icons.account_balance_wallet_rounded,
                             iconColor: AppColors.successGreen,
-                            title: 'Rp ${(widget.tukang.walletBalance / 1000).toStringAsFixed(0)}rb',
-                            subtitle: 'Saldo Dompet',
+                            title: NumberFormat.compactCurrency(locale: 'id', symbol: 'Rp ').format(widget.tukang.walletBalance),
+                            subtitle: 'Saldo Mitra',
                           ),
                         ),
                       ],
@@ -741,7 +972,7 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
               // Online / Offline Status Switch Bar
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -759,8 +990,8 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                     Row(
                       children: [
                         Container(
-                          width: 14,
-                          height: 14,
+                          width: 12,
+                          height: 12,
                           decoration: BoxDecoration(
                             color: _isOnline ? AppColors.successGreen : AppColors.textMuted,
                             shape: BoxShape.circle,
@@ -774,7 +1005,7 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _isOnline ? 'STATUS: ONLINE' : 'STATUS: OFFLINE',
+                              _isOnline ? 'RADAR AKTIF • ONLINE' : 'RADAR MATI • OFFLINE',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
@@ -782,7 +1013,9 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                               ),
                             ),
                             Text(
-                              _isOnline ? 'Radar memantau tiket di radius <= ${widget.tukang.workRadiusKm.toInt()} km' : 'Aktifkan untuk menerima notifikasi order terdekat',
+                              _isOnline
+                                  ? 'Memindai tiket radius ≤ ${widget.tukang.workRadiusKm.toInt()} km & ${widget.tukang.services.length} keahlian'
+                                  : 'Aktifkan untuk menerima notifikasi order terdekat',
                               style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
                             ),
                           ],
@@ -791,11 +1024,12 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                     ),
                     Switch(
                       value: _isOnline,
-                      activeColor: AppColors.successGreen,
+                      activeThumbColor: AppColors.successGreen,
+                      activeTrackColor: AppColors.successGreen.withValues(alpha: 0.4),
                       onChanged: (val) {
                         setState(() => _isOnline = val);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(val ? 'Anda Kembali ONLINE' : 'Anda Sedang OFFLINE')),
+                          SnackBar(content: Text(val ? 'Radar pekerjaan kembali ONLINE' : 'Radar pekerjaan kini OFFLINE')),
                         );
                       },
                     ),
@@ -830,40 +1064,40 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                   ),
                 ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
 
-              // Category Filter Bar (Horizontal Chips with Red Notification Badge Dot)
+              // Synchronized Category Filter Bar (Chips with Category Count Badges)
               BlocBuilder<TicketBloc, TicketState>(
                 builder: (context, state) {
                   final allTickets = state is TicketListLoadedState ? state.tickets : <TicketModel>[];
                   final tukangServices = widget.tukang.services;
 
-                  // Categories matching tukang's skills
+                  // Categories matching tukang's active skills
                   final relevantCategories = ServiceCategories.all
                       .where((cat) => tukangServices.contains(cat.id))
                       .toList();
 
-                  final hasAnyNewJob = allTickets.any((t) => tukangServices.contains(t.category));
+                  final totalOpenCount = allTickets.length;
 
                   return Container(
-                    height: 40,
-                    margin: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                    height: 42,
+                    margin: const EdgeInsets.only(left: 16, right: 16, bottom: 6),
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       children: [
                         _buildFilterChip(
                           'all',
                           'Semua Kategori',
-                          Icons.grid_view_rounded,
-                          hasNewBadge: hasAnyNewJob,
+                          Icons.dashboard_rounded,
+                          count: totalOpenCount,
                         ),
                         ...relevantCategories.map((cat) {
-                          final hasNewInCat = allTickets.any((t) => t.category == cat.id);
+                          final countInCat = allTickets.where((t) => t.category == cat.id).length;
                           return _buildFilterChip(
                             cat.id,
                             cat.name,
                             cat.icon,
-                            hasNewBadge: hasNewInCat,
+                            count: countInCat,
                           );
                         }),
                       ],
@@ -872,13 +1106,16 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                 },
               ),
 
-              // Job Radar Feed List
+              // Job Radar Feed List with RefreshIndicator
               Expanded(
                 child: BlocConsumer<TicketBloc, TicketState>(
                   listener: (context, state) {
                     if (state is BidSubmittedSuccessState) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Penawaran (Bid) Anda berhasil terkirim ke Pelanggan!'), backgroundColor: AppColors.successGreen),
+                        const SnackBar(
+                          content: Text('✓ Penawaran (Bid) Anda berhasil terkirim ke Pelanggan!'),
+                          backgroundColor: AppColors.successGreen,
+                        ),
                       );
                       _fetchRadar();
                     }
@@ -895,216 +1132,300 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                           : allTickets.where((t) => t.category == _selectedCategoryFilter).toList();
 
                       if (filteredTickets.isEmpty) {
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24.0),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.radar_rounded, size: 56, color: AppColors.textMuted),
-                                const SizedBox(height: 12),
-                                const Text('Belum Ada Tiket Pekerjaan di Radar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _selectedCategoryFilter == 'all'
-                                      ? 'Tidak ada tiket terbuka dalam radius jangkauan ${widget.tukang.workRadiusKm.toInt()} km. Jika pelanggan telah melock tukang lain, job akan otomatis hilang dari radar.'
-                                      : 'Tidak ada tiket kategori ini di sekitar lokasi Anda.',
-                                  style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
+                        return RefreshIndicator(
+                          color: AppColors.textDark,
+                          onRefresh: () async => _fetchRadar(),
+                          child: SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            child: Container(
+                              height: 380,
+                              alignment: Alignment.center,
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 72,
+                                    height: 72,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryLight.withValues(alpha: 0.15),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.radar_rounded, size: 40, color: AppColors.primary),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text('Belum Ada Tiket di Radar Saat Ini', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textDark)),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    _selectedCategoryFilter == 'all'
+                                        ? 'Radar memantau dalam radius ${widget.tukang.workRadiusKm.toInt()} km sesuai ${widget.tukang.services.length} keahlian aktif Anda. Tarik ke bawah untuk memindai ulang.'
+                                        : 'Tidak ada tiket kategori ini di sekitar lokasi Anda.',
+                                    style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  OutlinedButton.icon(
+                                    onPressed: _fetchRadar,
+                                    icon: const Icon(Icons.refresh_rounded, size: 16, color: AppColors.textDark),
+                                    label: const Text('Pindai Ulang Radar', style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold)),
+                                    style: OutlinedButton.styleFrom(
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         );
                       }
 
-                      return ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        itemCount: filteredTickets.length,
-                        itemBuilder: (context, index) {
-                          final ticket = filteredTickets[index];
-                          final hasAlreadyBid = ticket.bids.any((b) => b.tukangId == widget.tukang.id);
-                          final distance = _calculateDistanceInKm(tukangLat, tukangLng, ticket.lat, ticket.lng);
+                      return RefreshIndicator(
+                        color: AppColors.textDark,
+                        onRefresh: () async => _fetchRadar(),
+                        child: ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                          itemCount: filteredTickets.length,
+                          itemBuilder: (context, index) {
+                            final ticket = filteredTickets[index];
+                            final hasAlreadyBid = ticket.bids.any((b) => b.tukangId == widget.tukang.id);
+                            final distance = _calculateDistanceInKm(tukangLat, tukangLng, ticket.lat, ticket.lng);
+                            final categoryIcon = ServiceCategories.getIconForCategory(ticket.category);
 
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 14),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.04),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Top Badge Row (Category + Time Ago + Distance Pill)
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.bgAC,
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(ServiceCategories.getIconForCategory(ticket.category), size: 14, color: AppColors.primary),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  ticket.category.toUpperCase(),
-                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.primary),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: Colors.grey.shade100,
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.access_time_rounded, size: 12, color: Colors.grey.shade700),
-                                                const SizedBox(width: 3),
-                                                Text(
-                                                  _formatTimeAgo(ticket.createdAt),
-                                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.successGreen.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(20),
-                                          border: Border.all(color: AppColors.successGreen.withValues(alpha: 0.3)),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            const Icon(Icons.location_on, size: 12, color: AppColors.successGreen),
-                                            const SizedBox(width: 2),
-                                            Text(
-                                              '📍 ${distance.toStringAsFixed(1)} km',
-                                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.successGreen),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-
-                                  const SizedBox(height: 12),
-                                  Text(ticket.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textDark)),
-                                  const SizedBox(height: 4),
-                                  Text(ticket.description, style: const TextStyle(fontSize: 13, color: AppColors.textMuted), maxLines: 2, overflow: TextOverflow.ellipsis),
-                                  const SizedBox(height: 12),
-
-                                  // Customer & Address Info Card
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.background,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        Row(
-                                          children: [
-                                            CircleAvatar(
-                                              radius: 12,
-                                              backgroundColor: AppColors.primaryLight,
-                                              child: Text(
-                                                ticket.userName.isNotEmpty ? ticket.userName[0].toUpperCase() : 'U',
-                                                style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(ticket.userName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textDark)),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.place_outlined, size: 14, color: AppColors.textMuted),
-                                            const SizedBox(width: 4),
-                                            Expanded(child: Text(ticket.address, style: const TextStyle(fontSize: 11, color: AppColors.textMuted), overflow: TextOverflow.ellipsis)),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  const SizedBox(height: 16),
-
-                                  // Action Buttons: 1-Click Bid + Tombol Detail
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        flex: 3,
-                                        child: ElevatedButton.icon(
-                                          onPressed: (isSuspended || hasAlreadyBid) ? null : () => _submitDirect1ClickBid(ticket),
-                                          icon: Icon(
-                                            hasAlreadyBid ? Icons.check_circle_rounded : Icons.touch_app_rounded,
-                                            color: hasAlreadyBid ? AppColors.textMuted : Colors.white,
-                                            size: 16,
-                                          ),
-                                          label: Text(
-                                            hasAlreadyBid ? '✓ Anda Sudah Bid' : 'Bid',
-                                            style: TextStyle(
-                                              color: hasAlreadyBid ? AppColors.textMuted : Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppColors.textDark,
-                                            disabledBackgroundColor: Colors.grey.shade300,
-                                            disabledForegroundColor: AppColors.textMuted,
-                                            minimumSize: const Size.fromHeight(42),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        flex: 2,
-                                        child: OutlinedButton.icon(
-                                          onPressed: () => _showJobDetailBottomSheet(context, ticket, distance),
-                                          icon: const Icon(Icons.info_outline_rounded, size: 16, color: AppColors.textDark),
-                                          label: const Text(
-                                            'Detail',
-                                            style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold, fontSize: 12),
-                                          ),
-                                          style: OutlinedButton.styleFrom(
-                                            side: const BorderSide(color: AppColors.textDark, width: 1.5),
-                                            minimumSize: const Size.fromHeight(42),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 14),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.04),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
                                   ),
                                 ],
                               ),
-                            ),
-                          );
-                        },
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Row 1: Category Pill + Time Ago + Distance Pill
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.bgAC,
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(categoryIcon, size: 14, color: AppColors.primary),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    ticket.category.toUpperCase(),
+                                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.primary),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey.shade100,
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.access_time_rounded, size: 12, color: Colors.grey.shade700),
+                                                  const SizedBox(width: 3),
+                                                  Text(
+                                                    _formatTimeAgo(ticket.createdAt),
+                                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.successGreen.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(color: AppColors.successGreen.withValues(alpha: 0.3)),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(Icons.near_me_rounded, size: 12, color: AppColors.successGreen),
+                                              const SizedBox(width: 3),
+                                              Text(
+                                                '${distance.toStringAsFixed(1)} km',
+                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.successGreen),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+
+                                    const SizedBox(height: 12),
+                                    Text(ticket.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textDark)),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      ticket.description,
+                                      style: const TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.3),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+
+                                    // Ticket Photo Preview Strip (if customer uploaded photos)
+                                    if (ticket.photoUrls.isNotEmpty) ...[
+                                      const SizedBox(height: 10),
+                                      SizedBox(
+                                        height: 60,
+                                        child: ListView.separated(
+                                          scrollDirection: Axis.horizontal,
+                                          itemCount: ticket.photoUrls.length > 4 ? 4 : ticket.photoUrls.length,
+                                          separatorBuilder: (context, index) => const SizedBox(width: 8),
+                                          itemBuilder: (context, imgIdx) {
+                                            final isLast = imgIdx == 3 && ticket.photoUrls.length > 4;
+                                            final imgPath = ticket.photoUrls[imgIdx];
+                                            return GestureDetector(
+                                              onTap: () => _showImageViewer(context, imgPath),
+                                              child: Stack(
+                                                children: [
+                                                  _buildSafeImage(imgPath, width: 60, height: 60, radius: 8),
+                                                  if (isLast)
+                                                    Container(
+                                                      width: 60,
+                                                      height: 60,
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.black54,
+                                                        borderRadius: BorderRadius.circular(8),
+                                                      ),
+                                                      alignment: Alignment.center,
+                                                      child: Text(
+                                                        '+${ticket.photoUrls.length - 3}',
+                                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
+
+                                    const SizedBox(height: 12),
+
+                                    // Customer & Address Info Card
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.background,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          Row(
+                                            children: [
+                                              CircleAvatar(
+                                                radius: 12,
+                                                backgroundColor: AppColors.primary,
+                                                child: Text(
+                                                  ticket.userName.isNotEmpty ? ticket.userName[0].toUpperCase() : 'U',
+                                                  style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(ticket.userName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textDark)),
+                                              const Spacer(),
+                                              const Text('Pelanggan', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.place_outlined, size: 14, color: AppColors.textMuted),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  ticket.address,
+                                                  style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    const SizedBox(height: 14),
+
+                                    // Action Buttons: 1-Click Bid + Tombol Detail
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          flex: 3,
+                                          child: ElevatedButton.icon(
+                                            onPressed: (isSuspended || hasAlreadyBid) ? null : () => _submitDirect1ClickBid(ticket),
+                                            icon: Icon(
+                                              hasAlreadyBid ? Icons.check_circle_rounded : Icons.touch_app_rounded,
+                                              color: hasAlreadyBid ? AppColors.textMuted : Colors.white,
+                                              size: 16,
+                                            ),
+                                            label: Text(
+                                              hasAlreadyBid ? '✓ Penawaran Terkirim' : 'Kirim Penawaran (1-Klik)',
+                                              style: TextStyle(
+                                                color: hasAlreadyBid ? AppColors.textMuted : Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppColors.textDark,
+                                              disabledBackgroundColor: Colors.grey.shade200,
+                                              disabledForegroundColor: AppColors.textMuted,
+                                              minimumSize: const Size.fromHeight(42),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          flex: 2,
+                                          child: OutlinedButton.icon(
+                                            onPressed: () => _showJobDetailBottomSheet(context, ticket, distance),
+                                            icon: const Icon(Icons.info_outline_rounded, size: 16, color: AppColors.textDark),
+                                            label: const Text(
+                                              'Detail',
+                                              style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold, fontSize: 12),
+                                            ),
+                                            style: OutlinedButton.styleFrom(
+                                              side: const BorderSide(color: AppColors.textDark, width: 1.5),
+                                              minimumSize: const Size.fromHeight(42),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       );
                     }
 
@@ -1151,7 +1472,7 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
     );
   }
 
-  Widget _buildFilterChip(String id, String label, IconData icon, {bool hasNewBadge = false}) {
+  Widget _buildFilterChip(String id, String label, IconData icon, {int count = 0}) {
     final isSelected = _selectedCategoryFilter == id;
     return GestureDetector(
       onTap: () {
@@ -1159,59 +1480,51 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
           _selectedCategoryFilter = id;
         });
       },
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            margin: const EdgeInsets.only(right: 10, top: 3, bottom: 3),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: isSelected ? AppColors.textDark : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isSelected ? AppColors.textDark : AppColors.border),
-              boxShadow: [
-                if (isSelected)
-                  BoxShadow(color: AppColors.textDark.withValues(alpha: 0.2), blurRadius: 6, offset: const Offset(0, 2)),
-              ],
+      child: Container(
+        margin: const EdgeInsets.only(right: 8, top: 2, bottom: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.textDark : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? AppColors.textDark : AppColors.border),
+          boxShadow: [
+            if (isSelected)
+              BoxShadow(color: AppColors.textDark.withValues(alpha: 0.2), blurRadius: 6, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: isSelected ? Colors.white : AppColors.textDark),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? Colors.white : AppColors.textDark,
+              ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 14, color: isSelected ? Colors.white : AppColors.textDark),
-                const SizedBox(width: 6),
-                Text(
-                  label,
+            if (count > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white.withValues(alpha: 0.25) : AppColors.safetyAmber.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count',
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
                     color: isSelected ? Colors.white : AppColors.textDark,
                   ),
                 ),
-              ],
-            ),
-          ),
-          if (hasNewBadge)
-            Positioned(
-              top: 1,
-              right: 6,
-              child: Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(
-                  color: AppColors.dangerRed,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.dangerRed.withValues(alpha: 0.5),
-                      blurRadius: 4,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
               ),
-            ),
-        ],
+            ],
+          ],
+        ),
       ),
     );
   }

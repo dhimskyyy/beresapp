@@ -1,7 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/service_categories.dart';
 import '../../../data/models/tukang_model.dart';
@@ -37,10 +35,6 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
   final _accountNumberController = TextEditingController();
   final _accountNameController = TextEditingController();
 
-  // Step 4: KTP Upload
-  XFile? _ktpFile;
-  final ImagePicker _picker = ImagePicker();
-
   void _calculateAge(DateTime birthDate) {
     final now = DateTime.now();
     int age = now.year - birthDate.year;
@@ -51,22 +45,6 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
       _birthDate = birthDate;
       _age = age;
     });
-  }
-
-  Future<void> _pickKtp(ImageSource source) async {
-    try {
-      final picked = await _picker.pickImage(source: source, imageQuality: 80);
-      if (picked != null) {
-        setState(() {
-          _ktpFile = picked;
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal mengambil gambar: $e')),
-      );
-    }
   }
 
   void _addPayoutAccount() {
@@ -108,10 +86,6 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tambahkan minimal 1 rekening payout')));
       return;
     }
-    if (_ktpFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unggah foto KTP Anda')));
-      return;
-    }
 
     context.read<AuthBloc>().add(
       TukangRegisterRequestedEvent(
@@ -123,7 +97,7 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
         age: _age,
         services: _selectedServices,
         payoutAccounts: _payoutAccounts,
-        ktpPath: _ktpFile!.path,
+        ktpPath: '',
       ),
     );
   }
@@ -173,7 +147,7 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
               type: StepperType.horizontal,
               currentStep: _currentStep,
               onStepContinue: () {
-                if (_currentStep < 3) {
+                if (_currentStep < 2) {
                   setState(() => _currentStep++);
                 } else {
                   _submitOnboarding();
@@ -198,7 +172,7 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           child: Text(
-                            _currentStep == 3 ? 'Kirim Pendaftaran' : 'Lanjut',
+                            _currentStep == 2 ? 'Kirim Pendaftaran' : 'Lanjut',
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -227,7 +201,7 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
                     children: [
                       TextFormField(
                         controller: _nameController,
-                        decoration: const InputDecoration(labelText: 'Nama Lengkap (Sesuai KTP)', prefixIcon: Icon(Icons.person)),
+                        decoration: const InputDecoration(labelText: 'Nama Lengkap', prefixIcon: Icon(Icons.person)),
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -399,63 +373,6 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
                     ],
                   ),
                 ),
-
-                // Step 4: KTP Upload
-                Step(
-                  title: const Text('Upload KTP'),
-                  isActive: _currentStep >= 3,
-                  content: Column(
-                    children: [
-                      const Text(
-                        'Unggah Foto KTP Asli untuk Verifikasi Keamanan Admin',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                      const SizedBox(height: 16),
-                      Container(
-                        height: 180,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.border, width: 2),
-                        ),
-                        child: _ktpFile != null
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(14),
-                                child: Image.file(File(_ktpFile!.path), fit: BoxFit.cover),
-                              )
-                            : const Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.badge_outlined, size: 48, color: AppColors.textMuted),
-                                  SizedBox(height: 8),
-                                  Text('Foto KTP Belum Diunggah', style: TextStyle(color: AppColors.textMuted)),
-                                ],
-                              ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _pickKtp(ImageSource.camera),
-                              icon: const Icon(Icons.camera_alt),
-                              label: const Text('Ambil Kamera'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _pickKtp(ImageSource.gallery),
-                              icon: const Icon(Icons.photo_library),
-                              label: const Text('Dari Galeri'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           );
@@ -484,25 +401,32 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  isVerified ? 'Akun Mitra Terverifikasi!' : 'Dokumen Anda Sedang Ditinjau Admin',
+                  isVerified ? 'Akun Mitra Terverifikasi!' : 'Pendaftaran Anda Sedang Ditinjau Admin',
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   isVerified
-                      ? 'Selamat, KTP Anda telah disetujui Admin. Anda sudah bisa menerima order.'
-                      : 'Terima kasih ${tukang.name}. KTP dan data keahlian Anda sedang ditinjau Admin Beres. Begitu disetujui, Anda siap menerima tiket pekerjaan.',
+                      ? 'Selamat, pendaftaran Anda telah disetujui Admin. Anda sudah bisa mulai menerima order pekerjaan.'
+                      : 'Terima kasih ${tukang.name}. Data pendaftaran dan keahlian Anda sedang ditinjau Admin Beres.',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: () {
-                    context.read<AuthBloc>().add(SignOutRequestedEvent());
+                    if (isVerified) {
+                      Navigator.popUntil(context, (route) => route.isFirst);
+                    } else {
+                      context.read<AuthBloc>().add(SignOutRequestedEvent());
+                    }
                   },
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                  child: const Text('Keluar / Refresh Status', style: TextStyle(color: Colors.white)),
+                  child: Text(
+                    isVerified ? 'Masuk ke Dashboard Mitra' : 'Keluar / Refresh Status',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
                 )
               ],
             ),

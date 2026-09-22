@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/ticket_model.dart';
+import 'user_rating_modal.dart';
 import '../bloc/payment_bloc.dart';
 import '../bloc/payment_event.dart';
 import '../bloc/payment_state.dart';
@@ -30,10 +31,8 @@ class _UserPaymentModalState extends State<UserPaymentModal> {
       child: BlocConsumer<PaymentBloc, PaymentState>(
         listener: (context, state) {
           if (state is PaymentCompletedSuccessState) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Pembayaran Berhasil! Tiket lunas.'), backgroundColor: AppColors.successGreen),
-            );
             Navigator.pop(context);
+            UserRatingModal.show(context, widget.ticket);
           } else if (state is PaymentFailureState) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.message), backgroundColor: AppColors.dangerRed),

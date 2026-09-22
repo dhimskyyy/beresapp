@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -37,6 +38,105 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
     _workRadiusKm = widget.tukang.workRadiusKm;
   }
 
+  LinearGradient _getProviderGradient(String provider) {
+    switch (provider.toUpperCase()) {
+      case 'BCA':
+        return const LinearGradient(
+          colors: [Color(0xFF003D79), Color(0xFF0066CC)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      case 'MANDIRI':
+        return const LinearGradient(
+          colors: [Color(0xFF002D62), Color(0xFF0B4E9E)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      case 'BRI':
+        return const LinearGradient(
+          colors: [Color(0xFF00529C), Color(0xFF007AE6)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      case 'BNI':
+        return const LinearGradient(
+          colors: [Color(0xFF005E6A), Color(0xFF00899B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      case 'GOPAY':
+        return const LinearGradient(
+          colors: [Color(0xFF006C84), Color(0xFF00AA13)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      case 'OVO':
+        return const LinearGradient(
+          colors: [Color(0xFF4C2A86), Color(0xFF7A42C4)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      case 'DANA':
+        return const LinearGradient(
+          colors: [Color(0xFF108EE9), Color(0xFF1677FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      case 'SHOPEEPAY':
+        return const LinearGradient(
+          colors: [Color(0xFFEE4D2D), Color(0xFFFF6433)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      default:
+        return const LinearGradient(
+          colors: [Color(0xFF1E293B), Color(0xFF334155)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+    }
+  }
+
+  Color _getProviderShadowColor(String provider) {
+    switch (provider.toUpperCase()) {
+      case 'BCA':
+      case 'MANDIRI':
+      case 'BRI':
+      case 'BNI':
+        return const Color(0xFF00529C);
+      case 'GOPAY':
+        return const Color(0xFF00AA13);
+      case 'OVO':
+        return const Color(0xFF6B3BA7);
+      case 'DANA':
+        return const Color(0xFF108EE9);
+      case 'SHOPEEPAY':
+        return const Color(0xFFEE4D2D);
+      default:
+        return const Color(0xFF1E293B);
+    }
+  }
+
+  String _formatAccountNumber(String raw, String type) {
+    final clean = raw.replaceAll(RegExp(r'\s+'), '');
+    if (clean.isEmpty) return '•••• •••• •••• ••••';
+    if (type == 'bank') {
+      final buffer = StringBuffer();
+      for (int i = 0; i < clean.length; i++) {
+        if (i > 0 && i % 4 == 0) buffer.write(' ');
+        buffer.write(clean[i]);
+      }
+      return buffer.toString();
+    } else {
+      if (clean.length > 8) {
+        return '${clean.substring(0, 4)} ${clean.substring(4, 8)} ${clean.substring(8)}';
+      } else if (clean.length > 4) {
+        return '${clean.substring(0, 4)} ${clean.substring(4)}';
+      }
+      return clean;
+    }
+  }
+
   void _showEditServicesModal() {
     final availableCategories = ServiceCategories.all;
     final tempSelected = List<String>.from(_services);
@@ -44,113 +144,351 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 20,
-                top: 20,
-                left: 20,
-                right: 20,
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.85,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Edit Keahlian Layanan',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  // Drag handle
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 8),
+                      width: 44,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(3),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(modalCtx),
-                      ),
-                    ],
+                    ),
                   ),
-                  const Text(
-                    'Pilih kategori pekerjaan yang dapat Anda kerjakan:',
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 12),
-                  ),
-                  const SizedBox(height: 12),
 
-                  Flexible(
-                    child: ListView.builder(
-                      shrinkWrap: true,
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.handyman_rounded, color: AppColors.primary, size: 24),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Kelola Keahlian Layanan',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textDark),
+                              ),
+                              const SizedBox(height: 2),
+                              const Text(
+                                'Pilih bidang pekerjaan Anda untuk menerima order tiket.',
+                                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: AppColors.textMuted),
+                          onPressed: () => Navigator.pop(modalCtx),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Counter & Fast Selection Actions Bar
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '${tempSelected.length}/${availableCategories.length} Kategori Aktif',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                          ),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            InkWell(
+                              onTap: () {
+                                setModalState(() {
+                                  tempSelected.clear();
+                                  tempSelected.addAll(availableCategories.map((c) => c.id));
+                                });
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                child: Text(
+                                  'Pilih Semua',
+                                  style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                            const Text(' • ', style: TextStyle(color: AppColors.textMuted)),
+                            InkWell(
+                              onTap: () {
+                                if (tempSelected.length > 1) {
+                                  setModalState(() {
+                                    final first = tempSelected.first;
+                                    tempSelected.clear();
+                                    tempSelected.add(first);
+                                  });
+                                }
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                child: Text(
+                                  'Sisakan 1',
+                                  style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const Divider(height: 12),
+
+                  // Category Cards List
+                  Expanded(
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                       itemCount: availableCategories.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (context, idx) {
                         final cat = availableCategories[idx];
                         final isSelected = tempSelected.contains(cat.id);
 
-                        return CheckboxListTile(
-                          activeColor: AppColors.textDark,
-                          secondary: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: cat.backgroundColor,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(cat.icon, color: AppColors.primary, size: 20),
-                          ),
-                          title: Text(cat.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          value: isSelected,
-                          onChanged: (val) {
-                            setModalState(() {
-                              if (val == true) {
-                                tempSelected.add(cat.id);
-                              } else {
-                                if (tempSelected.length > 1) {
-                                  tempSelected.remove(cat.id);
+                        return Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () {
+                              setModalState(() {
+                                if (isSelected) {
+                                  if (tempSelected.length > 1) {
+                                    tempSelected.remove(cat.id);
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Minimal harus memilih 1 kategori keahlian aktif.'),
+                                        backgroundColor: AppColors.dangerRed,
+                                      ),
+                                    );
+                                  }
                                 } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Minimal pilih 1 kategori keahlian.')),
-                                  );
+                                  tempSelected.add(cat.id);
                                 }
-                              }
-                            });
-                          },
+                              });
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isSelected ? cat.backgroundColor.withValues(alpha: 0.6) : Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isSelected ? AppColors.primary : AppColors.border,
+                                  width: isSelected ? 1.8 : 1,
+                                ),
+                                boxShadow: isSelected
+                                    ? [
+                                        BoxShadow(
+                                          color: AppColors.primary.withValues(alpha: 0.08),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        )
+                                      ]
+                                    : null,
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: cat.backgroundColor,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: isSelected ? AppColors.primary.withValues(alpha: 0.3) : Colors.transparent,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Icon(cat.icon, color: AppColors.primary, size: 24),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(
+                                              cat.name,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                                color: isSelected ? AppColors.textDark : AppColors.textMuted,
+                                              ),
+                                            ),
+                                            if (isSelected) ...[
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.successGreen.withValues(alpha: 0.15),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: const Text(
+                                                  'AKTIF',
+                                                  style: TextStyle(color: AppColors.successGreen, fontSize: 9, fontWeight: FontWeight.bold),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          cat.description,
+                                          style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    width: 26,
+                                    height: 26,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isSelected ? AppColors.primary : Colors.transparent,
+                                      border: Border.all(
+                                        color: isSelected ? AppColors.primary : Colors.grey.shade400,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: isSelected
+                                        ? const Icon(Icons.check, size: 16, color: Colors.white)
+                                        : null,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         );
                       },
                     ),
                   ),
 
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _services = tempSelected;
-                        });
-                        Navigator.pop(modalCtx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Keahlian layanan berhasil diperbarui!'),
-                            backgroundColor: AppColors.successGreen,
-                          ),
-                        );
-                        // Refresh radar with updated services
-                        context.read<TicketBloc>().add(
-                              FetchTukangRadarTicketsEvent(
-                                services: _services,
-                                lat: widget.tukang.currentLocation?.lat ?? -6.2088,
-                                lng: widget.tukang.currentLocation?.lng ?? 106.8456,
-                                radiusKm: _workRadiusKm,
+                  // Bottom Action
+                  Container(
+                    padding: EdgeInsets.only(
+                      left: 20,
+                      right: 20,
+                      top: 14,
+                      bottom: MediaQuery.of(modalCtx).padding.bottom + 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -3)),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.info_outline, size: 14, color: AppColors.primary),
+                            SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Radar tiket order otomatis menyesuaikan keahlian terpilih.',
+                                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                               ),
-                            );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.textDark,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text('Simpan Perubahan Keahlian', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _services = tempSelected;
+                              });
+                              final updatedTukang = widget.tukang.copyWith(services: tempSelected);
+                              context.read<AuthBloc>().add(TukangProfileUpdatedEvent(updatedTukang));
+                              Navigator.pop(modalCtx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      const Icon(Icons.check_circle, color: Colors.white),
+                                      const SizedBox(width: 8),
+                                      Text('${tempSelected.length} Keahlian layanan berhasil diperbarui!'),
+                                    ],
+                                  ),
+                                  backgroundColor: AppColors.successGreen,
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              );
+                              // Refresh radar with updated services
+                              context.read<TicketBloc>().add(
+                                    FetchTukangRadarTicketsEvent(
+                                      services: _services,
+                                      lat: widget.tukang.currentLocation?.lat ?? -6.2088,
+                                      lng: widget.tukang.currentLocation?.lng ?? 106.8456,
+                                      radiusKm: _workRadiusKm,
+                                    ),
+                                  );
+                            },
+                            icon: const Icon(Icons.check_rounded, color: Colors.white),
+                            label: Text(
+                              'Simpan Perubahan (${tempSelected.length} Keahlian)',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.textDark,
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -172,101 +510,532 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
     final nameCtrl = TextEditingController(text: currentAccount.accountName);
     String type = currentAccount.type;
 
-    final providers = ['BCA', 'Mandiri', 'BRI', 'BNI', 'GoPay', 'OVO', 'DANA', 'ShopeePay'];
+    final bankProviders = ['BCA', 'Mandiri', 'BRI', 'BNI'];
+    final ewalletProviders = ['GoPay', 'OVO', 'DANA', 'ShopeePay'];
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: Colors.transparent,
       builder: (modalCtx) {
         return StatefulBuilder(
           builder: (ctx, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 20,
-                top: 20,
-                left: 20,
-                right: 20,
+            final activeTab = type == 'bank' ? 0 : 1;
+            final currentProviderList = activeTab == 0 ? bankProviders : ewalletProviders;
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.88,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Edit Rekening Payout & E-Wallet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  const Text('Rekening ini digunakan untuk pencairan saldo hasil kerja Anda.', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                  const SizedBox(height: 16),
-
-                  DropdownButtonFormField<String>(
-                    value: providers.contains(providerCtrl.text) ? providerCtrl.text : 'BCA',
-                    decoration: const InputDecoration(
-                      labelText: 'Bank / E-Wallet Provider',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: providers.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        providerCtrl.text = val;
-                        setModalState(() {
-                          type = ['GoPay', 'OVO', 'DANA', 'ShopeePay'].contains(val) ? 'ewallet' : 'bank';
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-
-                  TextField(
-                    controller: numberCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: type == 'bank' ? 'Nomor Rekening Bank' : 'Nomor HP E-Wallet',
-                      hintText: type == 'bank' ? 'Contoh: 8820192831' : 'Contoh: 081234567890',
-                      border: const OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Nama Pemilik Rekening / Akun',
-                      hintText: 'Contoh: Ahmad Subarjo',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        if (numberCtrl.text.trim().isEmpty || nameCtrl.text.trim().isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Harap lengkapi semua bidang.')));
-                          return;
-                        }
-
-                        final updatedAcc = PayoutAccount(
-                          type: type,
-                          provider: providerCtrl.text,
-                          accountNumber: numberCtrl.text.trim(),
-                          accountName: nameCtrl.text.trim(),
-                        );
-
-                        setState(() {
-                          _payoutAccounts = [updatedAcc];
-                        });
-
-                        Navigator.pop(modalCtx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Rekening pencairan berhasil diperbarui!'), backgroundColor: AppColors.successGreen),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.textDark,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  // Top Drag Handle
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 8),
+                      width: 44,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(3),
                       ),
-                      child: const Text('Simpan Rekening Payout', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFECFDF5),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.successGreen, size: 24),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'Rekening Payout & E-Wallet',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textDark),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Pencairan saldo komisi & hasil kerja otomatis ditransfer ke sini.',
+                                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: AppColors.textMuted),
+                          onPressed: () => Navigator.pop(modalCtx),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const Divider(height: 12),
+
+                  // Scrollable Body
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 1. Virtual Card / E-Wallet Card Live Preview
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              gradient: _getProviderGradient(providerCtrl.text),
+                              borderRadius: BorderRadius.circular(18),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _getProviderShadowColor(providerCtrl.text).withValues(alpha: 0.35),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 34,
+                                          height: 24,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFDE047),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: const Color(0xFFCA8A04), width: 1),
+                                          ),
+                                          child: const Center(
+                                            child: Icon(Icons.memory, size: 16, color: Color(0xFF854D0E)),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Icon(Icons.contactless_rounded, color: Colors.white70, size: 20),
+                                      ],
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            providerCtrl.text.toUpperCase(),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 12,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black.withValues(alpha: 0.25),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              type == 'bank' ? 'BANK' : 'E-WALLET',
+                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 8),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 22),
+                                Text(
+                                  _formatAccountNumber(numberCtrl.text, type),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 2.2,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                                const SizedBox(height: 22),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'NAMA PEMILIK REKENING',
+                                          style: TextStyle(color: Colors.white70, fontSize: 9, letterSpacing: 1),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          nameCtrl.text.trim().isEmpty ? 'NAMA LENGKAP MITRA' : nameCtrl.text.trim().toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(alpha: 0.25),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.verified_rounded, color: Color(0xFF4ADE80), size: 13),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'TERDAFTAR',
+                                            style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // 2. Tab Segmented Selector: Bank vs E-Wallet
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setModalState(() {
+                                        type = 'bank';
+                                        if (!bankProviders.contains(providerCtrl.text)) {
+                                          providerCtrl.text = bankProviders.first;
+                                        }
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: type == 'bank' ? Colors.white : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(10),
+                                        boxShadow: type == 'bank'
+                                            ? [
+                                                BoxShadow(
+                                                  color: Colors.black.withValues(alpha: 0.05),
+                                                  blurRadius: 4,
+                                                  offset: const Offset(0, 2),
+                                                )
+                                              ]
+                                            : null,
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.account_balance_rounded,
+                                            size: 16,
+                                            color: type == 'bank' ? AppColors.primary : AppColors.textMuted,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Transfer Bank',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                              color: type == 'bank' ? AppColors.textDark : AppColors.textMuted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setModalState(() {
+                                        type = 'ewallet';
+                                        if (!ewalletProviders.contains(providerCtrl.text)) {
+                                          providerCtrl.text = ewalletProviders.first;
+                                        }
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: type == 'ewallet' ? Colors.white : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(10),
+                                        boxShadow: type == 'ewallet'
+                                            ? [
+                                                BoxShadow(
+                                                  color: Colors.black.withValues(alpha: 0.05),
+                                                  blurRadius: 4,
+                                                  offset: const Offset(0, 2),
+                                                )
+                                              ]
+                                            : null,
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.phone_android_rounded,
+                                            size: 16,
+                                            color: type == 'ewallet' ? AppColors.primary : AppColors.textMuted,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Dompet E-Wallet',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                              color: type == 'ewallet' ? AppColors.textDark : AppColors.textMuted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          // 3. Provider Chips Selector
+                          const Text(
+                            'Pilih Bank / Penyedia E-Wallet',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textDark),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: currentProviderList.map((p) {
+                              final isSelected = providerCtrl.text.toUpperCase() == p.toUpperCase();
+                              return ChoiceChip(
+                                label: Text(p),
+                                selected: isSelected,
+                                onSelected: (sel) {
+                                  if (sel) {
+                                    setModalState(() {
+                                      providerCtrl.text = p;
+                                    });
+                                  }
+                                },
+                                selectedColor: AppColors.primary.withValues(alpha: 0.12),
+                                backgroundColor: Colors.white,
+                                labelStyle: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: isSelected ? AppColors.primary : AppColors.textDark,
+                                ),
+                                side: BorderSide(
+                                  color: isSelected ? AppColors.primary : AppColors.border,
+                                  width: isSelected ? 1.5 : 1,
+                                ),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              );
+                            }).toList(),
+                          ),
+
+                          const SizedBox(height: 18),
+
+                          // 4. Input Fields
+                          Text(
+                            type == 'bank' ? 'Nomor Rekening Bank' : 'Nomor Handphone E-Wallet',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textDark),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: TextField(
+                              controller: numberCtrl,
+                              keyboardType: TextInputType.number,
+                              onChanged: (_) => setModalState(() {}),
+                              decoration: InputDecoration(
+                                prefixIcon: Icon(
+                                  type == 'bank' ? Icons.credit_card_rounded : Icons.phone_android_rounded,
+                                  color: AppColors.primary,
+                                  size: 20,
+                                ),
+                                hintText: type == 'bank' ? 'Masukkan nomor rekening (cth: 2102198765)' : 'Masukkan nomor HP (cth: 081234567890)',
+                                hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          const Text(
+                            'Nama Pemilik Rekening / Akun',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textDark),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: TextField(
+                              controller: nameCtrl,
+                              textCapitalization: TextCapitalization.words,
+                              onChanged: (_) => setModalState(() {}),
+                              decoration: const InputDecoration(
+                                prefixIcon: Icon(Icons.person_outline_rounded, color: AppColors.primary, size: 20),
+                                hintText: 'Nama lengkap sesuai rekening bank / e-wallet',
+                                hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          // Notice container
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Icon(Icons.shield_outlined, color: AppColors.primary, size: 18),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Pastikan nama pemilik rekening sama dengan nama akun Anda untuk kelancaran penarikan saldo instan.',
+                                    style: TextStyle(fontSize: 11, color: AppColors.textDark, height: 1.3),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Bottom Save Action
+                  Container(
+                    padding: EdgeInsets.only(
+                      left: 20,
+                      right: 20,
+                      top: 14,
+                      bottom: MediaQuery.of(modalCtx).padding.bottom + 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -3)),
+                      ],
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          if (numberCtrl.text.trim().isEmpty || nameCtrl.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Harap lengkapi nomor rekening dan nama pemilik.'),
+                                backgroundColor: AppColors.dangerRed,
+                              ),
+                            );
+                            return;
+                          }
+
+                          final updatedAcc = PayoutAccount(
+                            type: type,
+                            provider: providerCtrl.text,
+                            accountNumber: numberCtrl.text.trim(),
+                            accountName: nameCtrl.text.trim(),
+                          );
+
+                          setState(() {
+                            _payoutAccounts = [updatedAcc];
+                          });
+                          final updatedTukang = widget.tukang.copyWith(payoutAccounts: [updatedAcc]);
+                          context.read<AuthBloc>().add(TukangProfileUpdatedEvent(updatedTukang));
+
+                          Navigator.pop(modalCtx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  const Icon(Icons.check_circle, color: Colors.white),
+                                  const SizedBox(width: 8),
+                                  Text('Rekening payout ${updatedAcc.provider} berhasil disimpan!'),
+                                ],
+                              ),
+                              backgroundColor: AppColors.successGreen,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.check_circle_rounded, color: Colors.white),
+                        label: const Text(
+                          'Simpan Rekening Payout',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.textDark,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -414,6 +1183,8 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
                         setState(() {
                           _workRadiusKm = selectedRadius;
                         });
+                        final updatedTukang = widget.tukang.copyWith(workRadiusKm: selectedRadius);
+                        context.read<AuthBloc>().add(TukangProfileUpdatedEvent(updatedTukang));
                         Navigator.pop(modalCtx);
                         widget.onRadiusChanged?.call(selectedRadius);
 
@@ -451,45 +1222,185 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
     );
   }
 
-  void _showKtpViewerModal() {
-    showDialog(
+  void _showSopModal() {
+    showModalBottomSheet(
       context: context,
-      builder: (dialogCtx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.verified, color: AppColors.successGreen),
-            SizedBox(width: 8),
-            Text('Dokumen KTP Resmi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                widget.tukang.ktpUrl.isNotEmpty
-                    ? widget.tukang.ktpUrl
-                    : 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800',
-                height: 180,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  height: 180,
-                  color: AppColors.border,
-                  child: const Center(child: Icon(Icons.badge, size: 48, color: AppColors.textMuted)),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sopCtx) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.78,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.menu_book_rounded, color: AppColors.safetyAmber, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text('SOP & Pedoman Mitra Beres', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textDark)),
+                          SizedBox(height: 2),
+                          Text('Standar operasional wajib teknisi lapangan Beres', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: AppColors.textMuted),
+                      onPressed: () => Navigator.pop(sopCtx),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 12),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  children: [
+                    _buildSopItem(
+                      number: '01',
+                      title: 'Keselamatan Kerja (K3)',
+                      desc: 'Wajib mengenakan alas kaki pelindung, sarung tangan isolator, dan perlengkapan standar saat menangani perbaikan listrik, ketinggian, atau atap.',
+                      icon: Icons.health_and_safety_rounded,
+                      color: AppColors.safetyAmber,
+                    ),
+                    _buildSopItem(
+                      number: '02',
+                      title: 'Foto Bukti Before & After',
+                      desc: 'Ambil foto kondisi kerusakan sebelum dikerjakan dan foto hasil perbaikan setelah selesai sebagai bukti penyelesaian klaim pembayaran.',
+                      icon: Icons.camera_alt_rounded,
+                      color: AppColors.primaryLight,
+                    ),
+                    _buildSopItem(
+                      number: '03',
+                      title: 'Transparansi Biaya & Material',
+                      desc: 'Bila dibutuhkan penggantian suku cadang atau material baru, selalu diskusikan dan minta persetujuan pemilik tiket sebelum membeli atau memasang.',
+                      icon: Icons.receipt_long_rounded,
+                      color: AppColors.successGreen,
+                    ),
+                    _buildSopItem(
+                      number: '04',
+                      title: 'Jaminan Garansi Kerja 14 Hari',
+                      desc: 'Setiap pekerjaan bergaransi 14 hari. Apabila terjadi kendala pasca-pengerjaan, mitra didampingi tim Beres Care untuk penanganan tepat sasaran.',
+                      icon: Icons.verified_user_rounded,
+                      color: AppColors.primary,
+                    ),
+                    _buildSopItem(
+                      number: '05',
+                      title: 'Etika Ramah & Komunikasi Sopan',
+                      desc: 'Beri penjelasan yang jelas kepada customer mengenai akar permasalahan dan cara perawatan agar menjaga reputasi rating bintang 5 Anda.',
+                      icon: Icons.sentiment_very_satisfied_rounded,
+                      color: Colors.purple,
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 8,
+                  bottom: MediaQuery.of(sopCtx).padding.bottom + 16,
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(sopCtx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.textDark,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Saya Paham SOP Kerja', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSopItem({
+    required String number,
+    required String title,
+    required String desc,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
             ),
-            const SizedBox(height: 12),
-            Text('Nama KTP: ${widget.tukang.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            const SizedBox(height: 2),
-            Text('Status: ${widget.tukang.verificationStatus.toUpperCase()}', style: const TextStyle(color: AppColors.successGreen, fontSize: 12, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Tutup')),
+            child: Center(
+              child: Icon(icon, color: color, size: 20),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '$number. ',
+                      style: TextStyle(fontWeight: FontWeight.w900, color: color, fontSize: 13),
+                    ),
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textDark),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  desc,
+                  style: const TextStyle(fontSize: 11, color: AppColors.textMuted, height: 1.35),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -498,40 +1409,415 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
   void _showCustomerSupportModal() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Bantuan & Dukungan 24/7', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            const Text('Tim Support Beres siap membantu kendala operasional Anda.', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-            const SizedBox(height: 16),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (modalCtx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(modalCtx).padding.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag Handle
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
 
-            ListTile(
-              leading: const CircleAvatar(backgroundColor: Color(0xFFDCFCE7), child: Icon(Icons.chat, color: AppColors.successGreen)),
-              title: const Text('Chat WhatsApp CS', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('+62 852-5669-4929 (WA 24/7)', style: TextStyle(fontSize: 12)),
-              onTap: () {
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Membuka chat CS WhatsApp...')));
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const CircleAvatar(backgroundColor: Color(0xFFEFF6FF), child: Icon(Icons.phone, color: AppColors.primary)),
-              title: const Text('Call Center Beres', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('+62 852-5669-4929', style: TextStyle(fontSize: 12)),
-              onTap: () {
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Memanggil Call Center Beres...')));
-              },
-            ),
-          ],
-        ),
-      ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE0F2FE),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.headset_mic_rounded, color: Colors.blueAccent, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Bantuan & CS Beres 24/7',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textDark),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFF86EFAC)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.successGreen,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                                const Text(
+                                  'ONLINE 24/7 • Respons < 3 Menit',
+                                  style: TextStyle(color: Color(0xFF15803D), fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: AppColors.textMuted),
+                      onPressed: () => Navigator.pop(modalCtx),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Divider(height: 12),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                child: const Text(
+                  'Layanan bantuan prioritas khusus Mitra Teknisi Beres untuk kendala tiket, pembayaran, atau asistensi teknis lapangan.',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12, height: 1.3),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Channel 1: WhatsApp Priority
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFBBF7D0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: AppColors.successGreen,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.chat_rounded, color: Colors.white, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Text(
+                                  'WhatsApp CS Prioritas',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textDark),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  '+62 852-5669-4929 (Chat Siaga 24 Jam)',
+                                  style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Tercepat',
+                              style: TextStyle(color: Color(0xFF15803D), fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Clipboard.setData(const ClipboardData(text: '+6285256694929'));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Nomor WhatsApp CS berhasil disalin ke clipboard!'),
+                                    backgroundColor: AppColors.successGreen,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.copy_rounded, size: 14, color: AppColors.successGreen),
+                              label: const Text('Salin Nomor', style: TextStyle(color: AppColors.successGreen, fontSize: 12, fontWeight: FontWeight.bold)),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Color(0xFF86EFAC)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(modalCtx);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Row(
+                                      children: const [
+                                        Icon(Icons.open_in_new, color: Colors.white, size: 16),
+                                        SizedBox(width: 8),
+                                        Text('Menghubungkan ke Chat WhatsApp CS Beres...'),
+                                      ],
+                                    ),
+                                    backgroundColor: AppColors.successGreen,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
+                              label: const Text('Buka Chat WA', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.successGreen,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Channel 2: Hotline Call Center Darurat
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.phone_in_talk_rounded, color: Colors.white, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Text(
+                                  'Hotline Darurat Operasional',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textDark),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  '+62 852-5669-4929 (Bebas Pulsa)',
+                                  style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDBEAFE),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Darurat K3',
+                              style: TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Clipboard.setData(const ClipboardData(text: '+6285256694929'));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Nomor Hotline Darurat berhasil disalin!'),
+                                    backgroundColor: AppColors.primary,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.copy_rounded, size: 14, color: AppColors.primary),
+                              label: const Text('Salin Nomor', style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Color(0xFF93C5FD)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(modalCtx);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Row(
+                                      children: const [
+                                        Icon(Icons.call, color: Colors.white, size: 16),
+                                        SizedBox(width: 8),
+                                        Text('Memanggil Saluran Hotline Darurat Beres...'),
+                                      ],
+                                    ),
+                                    backgroundColor: AppColors.primary,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.phone, size: 14, color: Colors.white),
+                              label: const Text('Panggil CS', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Channel 3: Panduan & SOP Lapangan
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: AppColors.safetyAmber,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              'Pedoman SOP & Garansi 14 Hari',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textDark),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Panduan kerja, foto bukti & klaim material',
+                              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(modalCtx);
+                          _showSopModal();
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          backgroundColor: AppColors.safetyAmber.withValues(alpha: 0.15),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text(
+                          'Buka SOP',
+                          style: TextStyle(color: Color(0xFFB45309), fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // Security Trust Note
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.verified_user_outlined, size: 14, color: AppColors.textMuted),
+                    SizedBox(width: 6),
+                    Text(
+                      'Dilindungi oleh Beres Mitra Safety Network • Bebas Biaya',
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 10, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -600,7 +1886,7 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
                       children: [
                         Icon(Icons.verified_user, color: AppColors.successGreen, size: 14),
                         SizedBox(width: 4),
-                        Text('KTP TERVERIFIKASI ADMIN', style: TextStyle(color: AppColors.successGreen, fontSize: 11, fontWeight: FontWeight.bold)),
+                        Text('MITRA TERVERIFIKASI RESMI', style: TextStyle(color: AppColors.successGreen, fontSize: 11, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
@@ -645,26 +1931,106 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Keahlian & Kategori Layanan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textDark)),
-                            TextButton.icon(
-                              onPressed: _showEditServicesModal,
-                              icon: const Icon(Icons.edit, size: 14, color: AppColors.primary),
-                              label: const Text('Edit Keahlian', style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.handyman_rounded, color: AppColors.primary, size: 18),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Wrap(
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    spacing: 6,
+                                    runSpacing: 3,
+                                    children: [
+                                      const Text(
+                                        'Keahlian Layanan',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textDark),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          '${_services.length} Kategori',
+                                          style: const TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  const Text(
+                                    'Pekerjaan yang Anda terima di radar tiket',
+                                    style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            InkWell(
+                              onTap: _showEditServicesModal,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.background,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Icon(Icons.tune_rounded, size: 14, color: AppColors.primary),
+                                    SizedBox(width: 4),
+                                    Text('Kelola', style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 14),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: _services.map((cat) {
-                            return Chip(
-                              avatar: const Icon(Icons.check_circle, size: 16, color: AppColors.primary),
-                              label: Text(cat.toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                              backgroundColor: AppColors.bgAC,
-                              side: BorderSide.none,
+                          children: _services.map((serviceId) {
+                            final catItem = ServiceCategories.findById(serviceId.toLowerCase());
+                            final displayName = catItem?.name ?? serviceId.toUpperCase();
+                            final icon = catItem?.icon ?? Icons.build_rounded;
+                            final bg = catItem?.backgroundColor ?? AppColors.bgAC;
+
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: bg,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(icon, size: 15, color: AppColors.primary),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    displayName,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textDark,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  const Icon(Icons.check_circle_rounded, size: 12, color: AppColors.successGreen),
+                                ],
+                              ),
                             );
                           }).toList(),
                         ),
@@ -681,7 +2047,7 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
                     iconColor: AppColors.successGreen,
                     title: 'Rekening Payout & Pencairan',
                     subtitle: currentPayout != null
-                        ? '${currentPayout.provider} • ${currentPayout.accountNumber} (a.n ${currentPayout.accountName})'
+                        ? '${currentPayout.provider} • ${_formatAccountNumber(currentPayout.accountNumber, currentPayout.type)} (a.n ${currentPayout.accountName})'
                         : 'Belum diatur • Klik untuk tambah',
                     onTap: _showEditPayoutAccountModal,
                   ),
@@ -693,14 +2059,7 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
                     subtitle: 'Radius ${_workRadiusKm.toStringAsFixed(1)} km dari lokasi HP Anda',
                     onTap: _showEditRadiusModal,
                   ),
-                  _buildProfileTile(
-                    icon: Icons.badge_outlined,
-                    iconBg: const Color(0xFFFEF3C7),
-                    iconColor: AppColors.safetyAmber,
-                    title: 'Dokumen KTP & Identitas',
-                    subtitle: 'Terverifikasi • Lihat Dokumen KTP',
-                    onTap: _showKtpViewerModal,
-                  ),
+
                   _buildProfileTile(
                     icon: Icons.headset_mic_outlined,
                     iconBg: const Color(0xFFE0F2FE),

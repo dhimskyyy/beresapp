@@ -73,8 +73,6 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
     _mapController.move(point, _mapController.camera.zoom);
 
     final lat = point.latitude;
-    final lng = point.longitude;
-
     String areaName = 'Jakarta Selatan';
     String streetName = 'Jl. Ceria Indah';
     int streetNo = (point.latitude.abs() * 1000 % 80).toInt() + 1;

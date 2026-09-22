@@ -62,4 +62,10 @@ abstract class TicketRepository {
   Future<List<TicketModel>> getUserTickets(String userId);
   Future<List<TicketModel>> getTukangTickets(String tukangId);
   Future<TicketModel?> getTicketById(String ticketId);
+
+  Future<TicketModel> submitRatingReview({
+    required String ticketId,
+    required int stars,
+    required String review,
+  });
 }

@@ -20,6 +20,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<UserProfileUpdatedEvent>((event, emit) {
       emit(UserAuthenticatedState(event.user));
     });
+    on<TukangProfileUpdatedEvent>((event, emit) {
+      emit(TukangAuthenticatedState(event.tukang));
+    });
   }
 
   Future<void> _onCheckAuthStatus(CheckAuthStatusEvent event, Emitter<AuthState> emit) async {
