@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/services/supabase_storage_service.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../models/chat_message_model.dart';
 
 class ChatRepositoryImpl implements ChatRepository {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   static final Map<String, List<ChatMessageModel>> _mockChatsByTicket = {
     'TCK-801': [
       ChatMessageModel(
@@ -32,6 +35,7 @@ class ChatRepositoryImpl implements ChatRepository {
   };
 
   static final Map<String, StreamController<List<ChatMessageModel>>> _controllers = {};
+  static final Map<String, StreamSubscription<QuerySnapshot>?> _subscriptions = {};
 
   StreamController<List<ChatMessageModel>> _getController(String ticketId) {
     if (!_controllers.containsKey(ticketId)) {
@@ -44,13 +48,50 @@ class ChatRepositoryImpl implements ChatRepository {
   Stream<List<ChatMessageModel>> getChatMessagesStream(String ticketId) {
     final controller = _getController(ticketId);
     final initialList = _mockChatsByTicket[ticketId] ?? [];
-    
-    // Emit initial list after a short delay
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (!controller.isClosed) {
-        controller.add(List.from(initialList));
+
+    // Emit initial cache immediately
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (!controller.isClosed && (_mockChatsByTicket[ticketId]?.isNotEmpty ?? false)) {
+        controller.add(List.from(_mockChatsByTicket[ticketId]!));
       }
     });
+
+    // Listen to Firestore real-time sub-collection: tickets/{ticketId}/chats
+    _subscriptions[ticketId]?.cancel();
+    try {
+      _subscriptions[ticketId] = _firestore
+          .collection('tickets')
+          .doc(ticketId)
+          .collection('chats')
+          .orderBy('timestamp', descending: false)
+          .snapshots()
+          .listen(
+        (snapshot) {
+          if (!controller.isClosed) {
+            if (snapshot.docs.isNotEmpty) {
+              final messages = snapshot.docs
+                  .map((doc) => ChatMessageModel.fromMap(
+                        doc.data(),
+                        doc.id,
+                      ))
+                  .toList();
+              _mockChatsByTicket[ticketId] = messages;
+              controller.add(messages);
+            } else if (initialList.isNotEmpty) {
+              controller.add(List.from(initialList));
+            }
+          }
+        },
+        onError: (err) {
+          // Fallback silently if offline or rules blocked
+          if (!controller.isClosed && initialList.isNotEmpty) {
+            controller.add(List.from(initialList));
+          }
+        },
+      );
+    } catch (_) {
+      // Fallback
+    }
 
     return controller.stream;
   }
@@ -88,6 +129,18 @@ class ChatRepositoryImpl implements ChatRepository {
     final controller = _getController(ticketId);
     if (!controller.isClosed) {
       controller.add(List.from(_mockChatsByTicket[ticketId]!));
+    }
+
+    // Persist to Cloud Firestore
+    try {
+      await _firestore
+          .collection('tickets')
+          .doc(ticketId)
+          .collection('chats')
+          .doc(message.id)
+          .set(message.toMap());
+    } catch (e) {
+      // Offline fallback: message is already emitted to local stream
     }
 
     return message;

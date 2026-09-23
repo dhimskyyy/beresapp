@@ -23,9 +23,18 @@ import 'features/tukang/pages/mitra_chat_list_page.dart';
 import 'features/tukang/pages/mitra_job_feed_page.dart';
 import 'features/tukang/pages/mitra_job_history_page.dart';
 import 'features/tukang/pages/tukang_profile_page.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Firebase initialization note: $e');
+  }
   runApp(const BeresMitraApp());
 }
 

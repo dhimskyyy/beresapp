@@ -28,9 +28,18 @@ import 'features/user/pages/create_ticket_page.dart';
 import 'features/user/pages/live_tracking_page.dart';
 import 'features/user/pages/ticket_bids_page.dart';
 import 'features/user/pages/user_profile_page.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Firebase initialization note: $e');
+  }
   runApp(const BeresUserApp());
 }
 

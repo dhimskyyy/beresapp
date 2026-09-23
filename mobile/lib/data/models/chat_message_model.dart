@@ -18,6 +18,19 @@ class ChatMessageModel {
   });
 
   factory ChatMessageModel.fromMap(Map<String, dynamic> map, String id) {
+    DateTime parsedTime = DateTime.now();
+    final rawTime = map['timestamp'];
+    if (rawTime != null) {
+      if (rawTime is DateTime) {
+        parsedTime = rawTime;
+      } else {
+        try {
+          parsedTime = (rawTime as dynamic).toDate();
+        } catch (_) {
+          parsedTime = DateTime.tryParse(rawTime.toString()) ?? DateTime.now();
+        }
+      }
+    }
     return ChatMessageModel(
       id: id,
       senderId: map['senderId'] ?? '',
@@ -25,9 +38,7 @@ class ChatMessageModel {
       text: map['text'],
       imageUrl: map['imageUrl'],
       isRead: map['isRead'] ?? false,
-      timestamp: map['timestamp'] != null
-          ? DateTime.tryParse(map['timestamp'].toString()) ?? DateTime.now()
-          : DateTime.now(),
+      timestamp: parsedTime,
     );
   }
 

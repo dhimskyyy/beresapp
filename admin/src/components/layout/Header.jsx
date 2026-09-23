@@ -3,7 +3,7 @@ import { Clock, ShieldCheck, Bell, Sparkles } from 'lucide-react';
 import { useAdminData } from '../../context/AdminDataContext';
 
 export default function Header() {
-  const { tukangList, ticketsList, toast } = useAdminData();
+  const { tukangList, ticketsList, toast, isLiveConnected } = useAdminData();
   const [time, setTime] = useState('');
 
   useEffect(() => {
@@ -46,8 +46,19 @@ export default function Header() {
         </div>
 
         <div className="hidden md:flex items-center gap-2 pl-4 border-l border-slate-200">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-xs font-semibold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <div 
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+              isLiveConnected 
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' 
+                : 'bg-slate-50 text-slate-600 border-slate-200'
+            }`}
+            title={isLiveConnected ? "Terhubung ke Cloud Firestore beress-app" : "Mode Standalone"}
+          >
+            <span className={`w-2 h-2 rounded-full ${isLiveConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+            <span>{isLiveConnected ? 'Cloud Firestore Live' : 'Demo Mode'}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold">
             <span>{onlineTukangCount} Mitra Online</span>
           </div>
 

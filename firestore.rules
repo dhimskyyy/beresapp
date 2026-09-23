@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.admin == true;
+    }
+    function isTukangActive(tukangId) {
+      let tukangData = get(/databases/$(database)/documents/tukang/$(tukangId)).data;
+      return tukangData.verificationStatus == 'verified' && 
+             (tukangData.isSuspended == false || tukangData.suspendedUntil < request.time);
+    }
+
+    // Rules User
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Rules Tukang
+    match /tukang/{tukangId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(tukangId);
+      // Tukang tidak boleh mengubah verifikasi atau suspensi sendiri
+      allow update: if (isOwner(tukangId) && 
+                        !request.resource.data.diff(resource.data).affectedKeys()
+                        .hasAny(['verificationStatus', 'isSuspended', 'suspendedUntil', 'walletBalance']))
+                    || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Rules Tiket
+    match /tickets/{ticketId} {
+      allow read: if isAuthenticated();
+      // User yang authenticated bisa membuat tiket baru
+      allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || true);
+      // Update tiket dikontrol oleh user pembuat atau tukang yang ditunjuk / admin
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.selectedTukangId == request.auth.uid ||
+        (resource.data.status == 'OPEN' || resource.data.status == 'BIDDING') // Untuk submitting bid
+      );
+      allow delete: if isAdmin();
+
+      // Sub-koleksi Chats
+      match /chats/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    // Rules Permohonan Penarikan Dana
+    match /withdrawals/{withdrawId} {
+      allow read: if isAuthenticated() && (resource.data.tukangId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.tukangId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+  }
+}

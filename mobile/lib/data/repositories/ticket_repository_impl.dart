@@ -1,10 +1,22 @@
 import 'dart:math' as math;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../../core/services/supabase_storage_service.dart';
 import '../../domain/entities/ticket_status.dart';
 import '../../domain/repositories/ticket_repository.dart';
 import '../models/ticket_model.dart';
 
 class TicketRepositoryImpl implements TicketRepository {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  Future<void> _syncToFirestore(TicketModel ticket) async {
+    try {
+      await _firestore.collection('tickets').doc(ticket.id).set(ticket.toMap(), SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Firestore sync note for ${ticket.id}: $e');
+    }
+  }
+
   static final List<TicketModel> _mockTickets = [
     TicketModel(
       id: 'TCK-801',
@@ -207,6 +219,7 @@ class TicketRepositoryImpl implements TicketRepository {
       updatedAt: DateTime.now(),
     );
     _mockTickets.insert(0, ticket);
+    await _syncToFirestore(ticket);
     return ticket;
   }
 
@@ -218,7 +231,24 @@ class TicketRepositoryImpl implements TicketRepository {
     double radiusKm = 15.0,
     String? currentTukangId,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 600));
+    try {
+      final snapshot = await _firestore
+          .collection('tickets')
+          .where('status', whereIn: ['OPEN', 'BIDDING'])
+          .get();
+      for (final doc in snapshot.docs) {
+        final t = TicketModel.fromMap(doc.data(), doc.id);
+        final idx = _mockTickets.indexWhere((m) => m.id == t.id);
+        if (idx != -1) {
+          _mockTickets[idx] = t;
+        } else {
+          _mockTickets.insert(0, t);
+        }
+      }
+    } catch (e) {
+      debugPrint('Firestore getOpenTicketsForTukang fallback note: $e');
+    }
+
     return _mockTickets.where((t) {
       final isMatchingService = tukangServices.contains(t.category);
 
@@ -298,6 +328,7 @@ class TicketRepositoryImpl implements TicketRepository {
     );
 
     _mockTickets[index] = updatedTicket;
+    await _syncToFirestore(updatedTicket);
     return updatedTicket;
   }
 
@@ -307,7 +338,6 @@ class TicketRepositoryImpl implements TicketRepository {
     required String selectedTukangId,
     required String selectedTukangName,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 800));
     final index = _mockTickets.indexWhere((t) => t.id == ticketId);
     if (index == -1) throw Exception('Tiket tidak ditemukan');
 
@@ -337,6 +367,7 @@ class TicketRepositoryImpl implements TicketRepository {
     );
 
     _mockTickets[index] = updatedTicket;
+    await _syncToFirestore(updatedTicket);
     return updatedTicket;
   }
 
@@ -346,7 +377,6 @@ class TicketRepositoryImpl implements TicketRepository {
     required TicketStatus newStatus,
     String? cancelReason,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 600));
     final index = _mockTickets.indexWhere((t) => t.id == ticketId);
     if (index == -1) throw Exception('Tiket tidak ditemukan');
 
@@ -377,6 +407,7 @@ class TicketRepositoryImpl implements TicketRepository {
     );
 
     _mockTickets[index] = updated;
+    await _syncToFirestore(updated);
     return updated;
   }
 
@@ -424,6 +455,7 @@ class TicketRepositoryImpl implements TicketRepository {
     );
 
     _mockTickets[index] = updated;
+    await _syncToFirestore(updated);
     return updated;
   }
 
@@ -468,6 +500,7 @@ class TicketRepositoryImpl implements TicketRepository {
     );
 
     _mockTickets[index] = updated;
+    await _syncToFirestore(updated);
     return updated;
   }
 
@@ -512,24 +545,79 @@ class TicketRepositoryImpl implements TicketRepository {
     );
 
     _mockTickets[index] = updated;
+    await _syncToFirestore(updated);
     return updated;
   }
 
   @override
   Future<List<TicketModel>> getUserTickets(String userId) async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      final snapshot = await _firestore
+          .collection('tickets')
+          .where('userId', isEqualTo: userId)
+          .get();
+      if (snapshot.docs.isNotEmpty) {
+        final cloudTickets = snapshot.docs
+            .map((doc) => TicketModel.fromMap(doc.data(), doc.id))
+            .toList();
+        for (final ct in cloudTickets) {
+          final idx = _mockTickets.indexWhere((m) => m.id == ct.id);
+          if (idx != -1) {
+            _mockTickets[idx] = ct;
+          } else {
+            _mockTickets.add(ct);
+          }
+        }
+      }
+    } catch (_) {
+      // Fallback silently
+    }
     return _mockTickets.where((t) => t.userId == userId).toList();
   }
 
   @override
   Future<List<TicketModel>> getTukangTickets(String tukangId) async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      final snapshot = await _firestore
+          .collection('tickets')
+          .where('selectedTukangId', isEqualTo: tukangId)
+          .get();
+      if (snapshot.docs.isNotEmpty) {
+        final cloudTickets = snapshot.docs
+            .map((doc) => TicketModel.fromMap(doc.data(), doc.id))
+            .toList();
+        for (final ct in cloudTickets) {
+          final idx = _mockTickets.indexWhere((m) => m.id == ct.id);
+          if (idx != -1) {
+            _mockTickets[idx] = ct;
+          } else {
+            _mockTickets.add(ct);
+          }
+        }
+      }
+    } catch (_) {
+      // Fallback silently
+    }
     return _mockTickets.where((t) => t.selectedTukangId == tukangId || t.bids.any((b) => b.tukangId == tukangId)).toList();
   }
 
   @override
   Future<TicketModel?> getTicketById(String ticketId) async {
-    await Future.delayed(const Duration(milliseconds: 300));
+    try {
+      final doc = await _firestore.collection('tickets').doc(ticketId).get();
+      if (doc.exists && doc.data() != null) {
+        final cloudTicket = TicketModel.fromMap(doc.data()!, doc.id);
+        final idx = _mockTickets.indexWhere((t) => t.id == ticketId);
+        if (idx != -1) {
+          _mockTickets[idx] = cloudTicket;
+        } else {
+          _mockTickets.add(cloudTicket);
+        }
+        return cloudTicket;
+      }
+    } catch (_) {
+      // Fallback to cache
+    }
     try {
       return _mockTickets.firstWhere((t) => t.id == ticketId);
     } catch (_) {
@@ -577,6 +665,7 @@ class TicketRepositoryImpl implements TicketRepository {
     );
 
     _mockTickets[index] = updated;
+    await _syncToFirestore(updated);
     return updated;
   }
 }
