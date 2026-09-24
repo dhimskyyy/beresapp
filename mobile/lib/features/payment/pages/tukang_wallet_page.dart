@@ -1137,9 +1137,46 @@ class _TukangWalletPageState extends State<TukangWalletPage> {
                                 ),
                               ),
                               title: Text(tx.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: AppColors.textDark)),
-                              subtitle: Text(
-                                '${tx.createdAt.day}/${tx.createdAt.month}/${tx.createdAt.year} • ${tx.status.toUpperCase()}',
-                                style: const TextStyle(fontSize: 10.5, color: AppColors.textMuted),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 6,
+                                  runSpacing: 3,
+                                  children: [
+                                    Text(
+                                      '${tx.createdAt.day}/${tx.createdAt.month}/${tx.createdAt.year}',
+                                      style: const TextStyle(fontSize: 10.5, color: AppColors.textMuted),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: (tx.status.toLowerCase() == 'approved' || tx.status.toLowerCase() == 'completed')
+                                            ? AppColors.successGreen.withValues(alpha: 0.12)
+                                            : tx.status.toLowerCase() == 'rejected'
+                                                ? AppColors.dangerRed.withValues(alpha: 0.12)
+                                                : AppColors.safetyAmber.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        (tx.status.toLowerCase() == 'approved' || tx.status.toLowerCase() == 'completed')
+                                            ? 'BERHASIL'
+                                            : tx.status.toLowerCase() == 'rejected'
+                                                ? 'DITOLAK'
+                                                : 'MENUNGGU',
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: (tx.status.toLowerCase() == 'approved' || tx.status.toLowerCase() == 'completed')
+                                              ? AppColors.successGreen
+                                              : tx.status.toLowerCase() == 'rejected'
+                                                  ? AppColors.dangerRed
+                                                  : const Color(0xFFB45309),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                               trailing: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,

@@ -1,29 +1,37 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/services/supabase_storage_service.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../models/user_model.dart';
 import '../models/tukang_model.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
-  // In-memory mock storage for local testing when Firebase config is pending
-  static final Map<String, UserModel> _mockUsers = {};
-  static final Map<String, TukangModel> _mockTukangs = {};
-  dynamic _currentUser;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  Future<UserModel> _loadUserProfile(User user) async {
+    final snapshot = await _firestore.collection('users').doc(user.uid).get();
+    if (!snapshot.exists) {
+      throw Exception('Profil user tidak ditemukan');
+    }
+    return UserModel.fromMap(snapshot.data()!, user.uid);
+  }
+
+  Future<TukangModel> _loadTukangProfile(User user) async {
+    final snapshot = await _firestore.collection('tukang').doc(user.uid).get();
+    if (!snapshot.exists) {
+      throw Exception('Profil mitra tidak ditemukan');
+    }
+    return TukangModel.fromMap(snapshot.data()!, user.uid);
+  }
 
   @override
   Future<UserModel> loginUserWithEmail(String email, String password) async {
-    await Future.delayed(const Duration(milliseconds: 800));
-    final existing = _mockUsers.values.firstWhere(
-      (u) => u.email.toLowerCase() == email.toLowerCase(),
-      orElse: () => UserModel(
-        id: 'usr_${DateTime.now().millisecondsSinceEpoch}',
-        name: email.split('@').first,
-        email: email,
-        phone: '081234567890',
-        createdAt: DateTime.now(),
-      ),
+    final credential = await _auth.signInWithEmailAndPassword(
+      email: email.trim(),
+      password: password,
     );
-    _currentUser = existing;
-    return existing;
+    return _loadUserProfile(credential.user!);
   }
 
   @override
@@ -33,58 +41,33 @@ class AuthRepositoryImpl implements AuthRepository {
     String phone,
     String password,
   ) async {
-    await Future.delayed(const Duration(milliseconds: 1000));
+    final credential = await _auth.createUserWithEmailAndPassword(
+      email: email.trim(),
+      password: password,
+    );
     final user = UserModel(
-      id: 'usr_${DateTime.now().millisecondsSinceEpoch}',
+      id: credential.user!.uid,
       name: name,
       email: email,
       phone: phone,
       createdAt: DateTime.now(),
     );
-    _mockUsers[user.id] = user;
-    _currentUser = user;
+    await _firestore.collection('users').doc(user.id).set(user.toMap());
     return user;
   }
 
   @override
   Future<UserModel> signInUserWithGoogle() async {
-    await Future.delayed(const Duration(milliseconds: 1200));
-    final user = UserModel(
-      id: 'usr_google_${DateTime.now().millisecondsSinceEpoch}',
-      name: 'Google User',
-      email: 'user.google@gmail.com',
-      phone: '081299887766',
-      photoUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-      createdAt: DateTime.now(),
-    );
-    _currentUser = user;
-    return user;
+    throw UnimplementedError('Google Sign-In belum dikonfigurasi untuk production');
   }
 
   @override
   Future<TukangModel> loginTukangWithEmail(String email, String password) async {
-    await Future.delayed(const Duration(milliseconds: 800));
-    final existing = _mockTukangs.values.firstWhere(
-      (t) => t.email.toLowerCase() == email.toLowerCase(),
-      orElse: () => TukangModel(
-        id: 'tkg_${DateTime.now().millisecondsSinceEpoch}',
-        name: 'Pak ${email.split('@').first}',
-        email: email,
-        phone: '081388990011',
-        birthDate: '1990-05-12',
-        age: 35,
-        services: ['ac', 'plumbing'],
-        payoutAccounts: [
-          PayoutAccount(type: 'bank', provider: 'BCA', accountNumber: '2102198765', accountName: email.split('@').first)
-        ],
-        ktpUrl: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800',
-        verificationStatus: 'verified',
-        isOnline: true,
-        createdAt: DateTime.now(),
-      ),
+    final credential = await _auth.signInWithEmailAndPassword(
+      email: email.trim(),
+      password: password,
     );
-    _currentUser = existing;
-    return existing;
+    return _loadTukangProfile(credential.user!);
   }
 
   @override
@@ -99,6 +82,10 @@ class AuthRepositoryImpl implements AuthRepository {
     required List<PayoutAccount> payoutAccounts,
     required String ktpPath,
   }) async {
+    final credential = await _auth.createUserWithEmailAndPassword(
+      email: email.trim(),
+      password: password,
+    );
     final uploadedKtpUrl = ktpPath.isNotEmpty
         ? await SupabaseStorageService.uploadImage(
             filePath: ktpPath,
@@ -107,7 +94,7 @@ class AuthRepositoryImpl implements AuthRepository {
         : '';
 
     final tukang = TukangModel(
-      id: 'tkg_${DateTime.now().millisecondsSinceEpoch}',
+      id: credential.user!.uid,
       name: name,
       email: email,
       phone: phone,
@@ -116,45 +103,35 @@ class AuthRepositoryImpl implements AuthRepository {
       services: services,
       payoutAccounts: payoutAccounts,
       ktpUrl: uploadedKtpUrl,
-      verificationStatus: 'verified',
-      isOnline: true,
+      verificationStatus: 'pending_verification',
+      isOnline: false,
       createdAt: DateTime.now(),
     );
-    _mockTukangs[tukang.id] = tukang;
-    _currentUser = tukang;
+    await _firestore.collection('tukang').doc(tukang.id).set(tukang.toMap());
     return tukang;
   }
 
   @override
   Future<TukangModel> signInTukangWithGoogle() async {
-    await Future.delayed(const Duration(milliseconds: 1200));
-    final tukang = TukangModel(
-      id: 'tkg_google_${DateTime.now().millisecondsSinceEpoch}',
-      name: 'Budi Tukang Google',
-      email: 'tukang.google@gmail.com',
-      phone: '081399887766',
-      birthDate: '1988-08-08',
-      age: 38,
-      services: ['ac', 'elektronik'],
-      payoutAccounts: [
-        PayoutAccount(type: 'bank', provider: 'BCA', accountNumber: '2102198888', accountName: 'Budi Tukang')
-      ],
-      ktpUrl: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800',
-      verificationStatus: 'pending_verification',
-      isOnline: false,
-      createdAt: DateTime.now(),
-    );
-    _currentUser = tukang;
-    return tukang;
+    throw UnimplementedError('Google Sign-In belum dikonfigurasi untuk production');
   }
 
   @override
   Future<void> signOut() async {
-    _currentUser = null;
+    await _auth.signOut();
   }
 
   @override
   Future<dynamic> getCurrentUser() async {
-    return _currentUser;
+    final user = _auth.currentUser;
+    if (user == null) return null;
+
+    final userProfile = await _firestore.collection('users').doc(user.uid).get();
+    if (userProfile.exists) return UserModel.fromMap(userProfile.data()!, user.uid);
+
+    final tukangProfile = await _firestore.collection('tukang').doc(user.uid).get();
+    if (tukangProfile.exists) return TukangModel.fromMap(tukangProfile.data()!, user.uid);
+
+    throw Exception('Profil akun tidak ditemukan');
   }
 }

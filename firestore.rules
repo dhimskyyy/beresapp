@@ -1,66 +1,74 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper Functions
-    function isAuthenticated() {
+    function signedIn() {
       return request.auth != null;
     }
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
+
     function isAdmin() {
-      return isAuthenticated() && request.auth.token.admin == true;
-    }
-    function isTukangActive(tukangId) {
-      let tukangData = get(/databases/$(database)/documents/tukang/$(tukangId)).data;
-      return tukangData.verificationStatus == 'verified' && 
-             (tukangData.isSuspended == false || tukangData.suspendedUntil < request.time);
+      return signedIn() && request.auth.token.admin == true;
     }
 
-    // Rules User
+    function isTukangVerified() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/tukang/$(request.auth.uid))
+        && get(/databases/$(database)/documents/tukang/$(request.auth.uid)).data.verificationStatus == 'verified'
+        && get(/databases/$(database)/documents/tukang/$(request.auth.uid)).data.isSuspended == false;
+    }
+
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isAdmin();
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if signedIn() && request.auth.uid == userId
+        && request.resource.data.role == 'user';
+      allow update: if signedIn() && request.auth.uid == userId
+        && request.resource.data.role == resource.data.role;
       allow delete: if isAdmin();
     }
 
-    // Rules Tukang
     match /tukang/{tukangId} {
-      allow read: if isAuthenticated();
-      allow create: if isOwner(tukangId);
-      // Tukang tidak boleh mengubah verifikasi atau suspensi sendiri
-      allow update: if (isOwner(tukangId) && 
-                        !request.resource.data.diff(resource.data).affectedKeys()
-                        .hasAny(['verificationStatus', 'isSuspended', 'suspendedUntil', 'walletBalance']))
-                    || isAdmin();
+      allow read: if signedIn() && (request.auth.uid == tukangId || isAdmin());
+      allow create: if signedIn() && request.auth.uid == tukangId
+        && request.resource.data.verificationStatus == 'pending_verification'
+        && request.resource.data.isSuspended == false;
+      allow update: if isAdmin() || (signedIn() && request.auth.uid == tukangId
+        && request.resource.data.verificationStatus == resource.data.verificationStatus
+        && request.resource.data.isSuspended == resource.data.isSuspended
+        && request.resource.data.walletBalance == resource.data.walletBalance);
       allow delete: if isAdmin();
     }
 
-    // Rules Tiket
     match /tickets/{ticketId} {
-      allow read: if isAuthenticated();
-      // User yang authenticated bisa membuat tiket baru
-      allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || true);
-      // Update tiket dikontrol oleh user pembuat atau tukang yang ditunjuk / admin
-      allow update: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        resource.data.selectedTukangId == request.auth.uid ||
-        (resource.data.status == 'OPEN' || resource.data.status == 'BIDDING') // Untuk submitting bid
+      allow read: if signedIn() && (
+        isAdmin()
+        || resource.data.userId == request.auth.uid
+        || resource.data.selectedTukangId == request.auth.uid
+        || (resource.data.status in ['OPEN', 'BIDDING'] && isTukangVerified())
       );
-      allow delete: if isAdmin();
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if signedIn() && (
+        isAdmin()
+        || resource.data.userId == request.auth.uid
+        || (resource.data.selectedTukangId == request.auth.uid && isTukangVerified())
+        || (resource.data.status in ['OPEN', 'BIDDING'] && isTukangVerified())
+      );
+      allow delete: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
 
-      // Sub-koleksi Chats
       match /chats/{messageId} {
-        allow read, write: if isAuthenticated();
+        allow read, write: if signedIn() && (
+          isAdmin()
+          || get(/databases/$(database)/documents/tickets/$(ticketId)).data.userId == request.auth.uid
+          || get(/databases/$(database)/documents/tickets/$(ticketId)).data.selectedTukangId == request.auth.uid
+        );
       }
     }
 
-    // Rules Permohonan Penarikan Dana
-    match /withdrawals/{withdrawId} {
-      allow read: if isAuthenticated() && (resource.data.tukangId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && request.resource.data.tukangId == request.auth.uid;
+    match /withdrawals/{withdrawalId} {
+      allow read: if signedIn() && (
+        isAdmin() || resource.data.tukangId == request.auth.uid
+      );
+      allow create: if signedIn() && request.resource.data.tukangId == request.auth.uid
+        && isTukangVerified()
+        && request.resource.data.status == 'pending';
       allow update, delete: if isAdmin();
     }
   }

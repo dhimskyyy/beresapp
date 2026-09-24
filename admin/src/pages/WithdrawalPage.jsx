@@ -26,10 +26,10 @@ export default function WithdrawalPage() {
       w.status === 'rejected';
 
     const matchesSearch = 
-      w.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      w.tukangName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      w.payoutTarget.provider.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      w.payoutTarget.accountNumber.includes(searchQuery);
+      (w.id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (w.tukangName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (w.payoutTarget?.provider || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (w.payoutTarget?.accountNumber || '').includes(searchQuery);
 
     return matchesTab && matchesSearch;
   });

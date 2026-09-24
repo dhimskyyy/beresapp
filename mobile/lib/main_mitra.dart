@@ -105,11 +105,70 @@ class MitraMainRouter extends StatelessWidget {
       builder: (context, state) {
         if (state is TukangAuthenticatedState) {
           final t = state.tukang;
+          if (t.verificationStatus != 'verified' || t.isCurrentlySuspended) {
+            return MitraVerificationGate(tukang: t);
+          }
           return MitraBottomNavWrapper(tukang: t);
         }
 
         return const TukangLoginPage();
       },
+    );
+  }
+}
+
+class MitraVerificationGate extends StatelessWidget {
+  final TukangModel tukang;
+
+  const MitraVerificationGate({super.key, required this.tukang});
+
+  @override
+  Widget build(BuildContext context) {
+    final isSuspended = tukang.isCurrentlySuspended;
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Status Akun Mitra'),
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.textDark,
+        elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Keluar',
+            icon: const Icon(Icons.logout_rounded),
+            onPressed: () => context.read<AuthBloc>().add(SignOutRequestedEvent()),
+          ),
+        ],
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isSuspended ? Icons.lock_outline_rounded : Icons.hourglass_top_rounded,
+                size: 64,
+                color: isSuspended ? AppColors.dangerRed : AppColors.safetyAmber,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                isSuspended ? 'Akun sedang disuspend' : 'Menunggu verifikasi admin',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textDark),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isSuspended
+                    ? 'Akses radar, bidding, dan pekerjaan sementara dinonaktifkan.'
+                    : 'Profil Anda sudah tersimpan. Radar job dan bidding akan aktif setelah KYC disetujui admin.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textMuted, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

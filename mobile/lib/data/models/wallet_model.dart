@@ -90,7 +90,9 @@ class WithdrawalRequest {
   final double netAmount; // net amount transferred (e.g. 197500)
   final PayoutAccount payoutAccount;
   final String status; // 'pending', 'approved', 'rejected'
+  final String? adminNote;
   final DateTime createdAt;
+  final DateTime? processedAt;
 
   WithdrawalRequest({
     required this.id,
@@ -101,6 +103,45 @@ class WithdrawalRequest {
     required this.netAmount,
     required this.payoutAccount,
     required this.status,
+    this.adminNote,
     required this.createdAt,
+    this.processedAt,
   });
+
+  factory WithdrawalRequest.fromMap(Map<String, dynamic> map, String id) {
+    final payoutTargetMap = map['payoutTarget'] as Map<String, dynamic>? ?? {};
+    return WithdrawalRequest(
+      id: id,
+      tukangId: map['tukangId'] ?? '',
+      tukangName: map['tukangName'] ?? '',
+      amount: (map['amount'] ?? 0).toDouble(),
+      adminFee: (map['adminFee'] ?? 2500).toDouble(),
+      netAmount: (map['netAmount'] ?? 0).toDouble(),
+      payoutAccount: PayoutAccount.fromMap(payoutTargetMap),
+      status: map['status'] ?? 'pending',
+      adminNote: map['adminNote'],
+      createdAt: map['createdAt'] != null
+          ? DateTime.tryParse(map['createdAt'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      processedAt: map['processedAt'] != null
+          ? DateTime.tryParse(map['processedAt'].toString())
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'tukangId': tukangId,
+      'tukangName': tukangName,
+      'amount': amount,
+      'adminFee': adminFee,
+      'netAmount': netAmount,
+      'payoutTarget': payoutAccount.toMap(),
+      'status': status,
+      'adminNote': adminNote,
+      'createdAt': createdAt.toIso8601String(),
+      'processedAt': processedAt?.toIso8601String(),
+    };
+  }
 }

@@ -100,13 +100,50 @@ const mergeTukang = (cloudDocs, fallbackList) => {
   return Array.from(mergedMap.values());
 };
 
+const normalizeWithdrawal = (docData, docId) => {
+  const payoutTarget = docData.payoutTarget || {};
+  let formattedDate = 'Baru saja';
+  if (docData.requestedAt) {
+    formattedDate = docData.requestedAt;
+  } else if (docData.createdAt) {
+    try {
+      const d = new Date(docData.createdAt);
+      formattedDate = d.toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }) + ' WIB';
+    } catch (_) {
+      formattedDate = String(docData.createdAt);
+    }
+  }
+
+  return {
+    ...docData,
+    id: docId || docData.id,
+    amount: Number(docData.amount) || 0,
+    tukangName: docData.tukangName || 'Mitra Beres',
+    payoutTarget: {
+      type: payoutTarget.type || 'bank',
+      provider: payoutTarget.provider || 'BCA',
+      accountNumber: payoutTarget.accountNumber || '-',
+      accountName: payoutTarget.accountName || docData.tukangName || '-'
+    },
+    status: docData.status || 'pending',
+    requestedAt: formattedDate,
+    createdAt: docData.createdAt || new Date().toISOString()
+  };
+};
+
 const mergeWithdrawals = (cloudDocs, fallbackList) => {
   const mergedMap = new Map();
   for (const item of fallbackList) {
-    mergedMap.set(item.id, item);
+    mergedMap.set(item.id, normalizeWithdrawal(item, item.id));
   }
   for (const item of cloudDocs) {
-    mergedMap.set(item.id, { ...item, id: item.id });
+    mergedMap.set(item.id, normalizeWithdrawal(item, item.id));
   }
   return Array.from(mergedMap.values()).sort((a, b) => {
     const timeA = new Date(a.createdAt || 0).getTime();
