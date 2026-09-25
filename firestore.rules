@@ -21,7 +21,8 @@ service cloud.firestore {
       allow create: if signedIn() && request.auth.uid == userId
         && request.resource.data.role == 'user';
       allow update: if signedIn() && request.auth.uid == userId
-        && request.resource.data.role == resource.data.role;
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.id == resource.data.id;
       allow delete: if isAdmin();
     }
 
@@ -33,7 +34,8 @@ service cloud.firestore {
       allow update: if isAdmin() || (signedIn() && request.auth.uid == tukangId
         && request.resource.data.verificationStatus == resource.data.verificationStatus
         && request.resource.data.isSuspended == resource.data.isSuspended
-        && request.resource.data.walletBalance == resource.data.walletBalance);
+        && request.resource.data.walletBalance == resource.data.walletBalance
+        && request.resource.data.id == resource.data.id);
       allow delete: if isAdmin();
     }
 
@@ -44,21 +46,55 @@ service cloud.firestore {
         || resource.data.selectedTukangId == request.auth.uid
         || (resource.data.status in ['OPEN', 'BIDDING'] && isTukangVerified())
       );
-      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'OPEN';
       allow update: if signedIn() && (
         isAdmin()
-        || resource.data.userId == request.auth.uid
-        || (resource.data.selectedTukangId == request.auth.uid && isTukangVerified())
-        || (resource.data.status in ['OPEN', 'BIDDING'] && isTukangVerified())
+        || (resource.data.userId == request.auth.uid
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.paymentStatus == resource.data.paymentStatus
+          && (
+            (request.resource.data.status == resource.data.status)
+            || (resource.data.status in ['OPEN', 'BIDDING'] && request.resource.data.status == 'LOCKED' && request.resource.data.selectedTukangId != null)
+            || (resource.data.status in ['OPEN', 'BIDDING', 'LOCKED'] && request.resource.data.status == 'CANCELED')
+          ))
+        || (resource.data.selectedTukangId == request.auth.uid
+          && isTukangVerified()
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.selectedTukangId == resource.data.selectedTukangId
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.paymentStatus == resource.data.paymentStatus
+          && (
+            (resource.data.status == 'LOCKED' && request.resource.data.status == 'ON_THE_WAY')
+            || (resource.data.status == 'ON_THE_WAY' && request.resource.data.status == 'ARRIVED')
+            || (resource.data.status == 'ARRIVED' && request.resource.data.status == 'IN_PROGRESS')
+            || (resource.data.status == 'IN_PROGRESS' && request.resource.data.status == 'WORK_COMPLETED')
+            || (resource.data.status == 'WORK_COMPLETED' && request.resource.data.status == 'PAYMENT_PENDING')
+            || (request.resource.data.status == resource.data.status)
+          ))
+        || (resource.data.status in ['OPEN', 'BIDDING']
+          && isTukangVerified()
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.paymentStatus == resource.data.paymentStatus
+          && request.resource.data.status == 'BIDDING')
       );
-      allow delete: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow delete: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid && resource.data.status in ['OPEN', 'BIDDING', 'CANCELED']);
 
       match /chats/{messageId} {
-        allow read, write: if signedIn() && (
+        allow read: if signedIn() && (
           isAdmin()
           || get(/databases/$(database)/documents/tickets/$(ticketId)).data.userId == request.auth.uid
           || get(/databases/$(database)/documents/tickets/$(ticketId)).data.selectedTukangId == request.auth.uid
         );
+        allow create: if signedIn() && (
+          isAdmin()
+          || get(/databases/$(database)/documents/tickets/$(ticketId)).data.userId == request.auth.uid
+          || get(/databases/$(database)/documents/tickets/$(ticketId)).data.selectedTukangId == request.auth.uid
+        ) && request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if isAdmin();
       }
     }
 
@@ -69,6 +105,16 @@ service cloud.firestore {
       allow create: if signedIn() && request.resource.data.tukangId == request.auth.uid
         && isTukangVerified()
         && request.resource.data.status == 'pending';
+      allow update, delete: if isAdmin();
+    }
+
+    match /walletTransactions/{transactionId} {
+      allow read: if signedIn() && (
+        isAdmin() || resource.data.tukangId == request.auth.uid || resource.data.userId == request.auth.uid
+      );
+      allow create: if signedIn() && (
+        isAdmin() || request.resource.data.tukangId == request.auth.uid
+      );
       allow update, delete: if isAdmin();
     }
   }

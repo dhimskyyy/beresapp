@@ -114,7 +114,16 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
       ),
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
-          if (state is AuthFailureState) {
+          if (state is TukangAuthenticatedState) {
+            context.read<AuthBloc>().add(SignOutRequestedEvent());
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Pendaftaran berhasil dikirim. Silakan login setelah akun disetujui admin.'),
+                backgroundColor: AppColors.successGreen,
+              ),
+            );
+          } else if (state is AuthFailureState) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.message), backgroundColor: AppColors.dangerRed),
             );

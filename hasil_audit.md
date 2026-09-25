@@ -311,3 +311,208 @@ Evidence: [tukang_wallet_page.dart](mobile/lib/features/payment/pages/tukang_wal
 ## Kesimpulan
 
 Routing dasar user, mitra, dan admin **secara source sebagian besar tersedia dan tidak menunjukkan route target yang hilang**. Namun jawaban untuk “apakah semua berjalan sebagaimana mestinya” adalah **belum**. Autentikasi masih mock/permissive, admin tidak dilindungi login, Firestore rules memiliki bypass kritis, transaksi keuangan belum nyata/atomik, dan automated E2E hampir tidak ada. Prioritas pertama harus security rules dan autentikasi, kemudian konsistensi persistence/payment, baru penyempurnaan lint dan UX.
+
+## Handoff Implementasi Fase 1-5
+
+> Bagian ini adalah status terbaru setelah persetujuan user untuk mengerjakan Fase 1 sampai Fase 5. Bagian audit lama di atas memuat snapshot historis dan tidak boleh dipakai sebagai status terkini tanpa membaca addendum ini.
+
+### Scope yang disetujui
+
+User menyetujui lima target berikut:
+
+1. Deploy dan uji Firestore Rules untuk User, Mitra, dan Admin.
+2. Menjadikan UID Firebase sebagai ID utama pada `users/{uid}` dan `tukang/{uid}`, serta memakai struktur `tickets/{ticketId}`, `tickets/{ticketId}/chats/{messageId}`, `withdrawals/{withdrawalId}`, dan `walletTransactions/{transactionId}`.
+3. Mengganti `_mockTickets` sebagai sumber data production dengan Firestore; mock hanya boleh aktif pada mode demo/testing eksplisit.
+4. Menegakkan state machine ticket: `OPEN -> BIDDING -> LOCKED -> ON_THE_WAY -> ARRIVED -> IN_PROGRESS -> WORK_COMPLETED -> PAYMENT_PENDING -> COMPLETED`, dengan pembatalan terbatas pada status yang diizinkan.
+5. Menjadikan Admin realtime berbasis Firestore untuk users, tukang, tickets, dan withdrawals; KYC approve/reject harus menulis data real dan tidak hanya mengubah localStorage.
+
+### File yang sudah berubah
+
+#### `mobile/lib/data/repositories/ticket_repository_impl.dart`
+
+Sudah dikerjakan:
+
+- Menambahkan `_demoMode` dari `--dart-define=BERES_DEMO_MODE=true`.
+- Menambahkan `_loadTicket()` untuk mengambil ticket terbaru dari Firestore.
+- Menambahkan `_loadTicketForMutation()` yang memakai mock hanya ketika `_demoMode == true`.
+- `createTicket()` menulis ticket ke Firestore dan hanya memasukkan ke `_mockTickets` dalam demo mode.
+- `getOpenTicketsForTukang()` membaca query Firestore `OPEN/BIDDING`, bukan menggabungkan mock.
+- `submitBid()`, `lockTukang()`, `updateTicketStatus()`, `submitFinalBill()`, `approveFinalBill()`, `uploadWorkPhotos()`, dan `submitRatingReview()` sudah mengambil sumber ticket dari Firestore pada mode normal.
+- Menambahkan validasi transisi status melalui `_isValidStatusTransition()` sebelum update status.
+- `_mockTickets` masih berada di file sebagai fixture demo; ini sesuai target hanya jika demo mode memang eksplisit.
+
+#### `admin/src/context/AdminDataContext.jsx`
+
+Sudah dikerjakan:
+
+- Menambahkan `VITE_BERES_DEMO_MODE` sebagai flag demo eksplisit.
+- Pada mode normal, state awal users/tukang/tickets/withdrawals dimulai sebagai array kosong, bukan localStorage/mock.
+- `mergeTickets()`, `mergeTukang()`, dan `mergeWithdrawals()` tidak lagi menggabungkan fallback mock pada mode production.
+- Menambahkan listener realtime `onSnapshot(collection(db, 'users'))`.
+- Listener realtime users, tukang, tickets, dan withdrawals mengganti state dengan snapshot Firestore.
+- `approveKyc()`, `rejectKyc()`, `suspendTukang()`, `unsuspendTukang()`, `approveWithdrawal()`, dan `rejectWithdrawal()` menunggu `setDoc()` selesai sebelum toast sukses.
+- Jika write gagal, action menampilkan toast error dan tidak melakukan optimistic update.
+- `resetDemoData()` ditolak saat bukan demo mode.
+
+Yang perlu diverifikasi lebih lanjut pada file ini:
+
+- `localStorage` tidak lagi dipakai pada versi yang terbaca saat handoff, tetapi agent berikutnya harus memastikan tidak ada perubahan paralel yang mengembalikannya.
+- Listener masih hanya melakukan `console.warn` pada error. UI perlu memiliki error state/retry agar kegagalan permission/network tidak tampak seperti data kosong biasa.
+- `normalizeTukang()` masih memberi default `verificationStatus: 'verified'` bila field Firestore hilang. Untuk security, default seharusnya `pending_verification`, bukan verified.
+- `approveKyc()` mengubah `isOnline: true` secara langsung; status online sebaiknya dipisahkan dari approval dan tidak otomatis dipaksa online.
+- Tidak ada snapshot listener `walletTransactions`; wallet belum menjadi bagian penuh dari Admin realtime.
+
+#### `firestore.rules`
+
+Sudah dikerjakan:
+
+- Menghapus rule global berbahaya `allow read, write: if true`.
+- Menambahkan helper `signedIn()`, `isAdmin()`, dan `isTukangVerified()`.
+- User hanya dapat membaca profile sendiri atau sebagai admin.
+- User hanya dapat membuat profile dengan UID sendiri dan role `user`.
+- Mitra hanya dapat membuat profile UID sendiri dengan status awal `pending_verification` dan tidak suspended.
+- Perubahan KYC, suspend, dan wallet dibatasi dari perubahan mandiri mitra.
+- Ticket create dibatasi agar `userId` sama dengan UID authenticated dan status awal `OPEN`.
+- Ticket read dibatasi owner ticket, tukang terpilih, mitra verified untuk ticket OPEN/BIDDING, atau admin.
+- Chat dibatasi owner ticket, tukang terpilih, atau admin.
+- Withdrawal create dibatasi mitra verified; update/delete hanya admin.
+- Field sensitif tertentu dijaga agar user/mitra tidak mengganti ownership, createdAt, paymentStatus, role, verification status, wallet, dan suspension.
+
+Yang belum selesai pada rules:
+
+- Rules belum terbukti sudah ter-deploy ke Firebase project aktif.
+- Rules belum diuji dengan Firebase Emulator atau test matrix authenticated user.
+- `allow delete` ticket masih mengizinkan owner menghapus ticket kapan saja; perlu keputusan bisnis apakah hanya status OPEN/CANCELED yang boleh dihapus.
+- Rule ticket update belum membatasi seluruh field sensitif seperti `selectedTukangId`, `selectedTukangName`, `bids`, `finalBill`, `beforePhotos`, `afterPhotos`, `rating`, dan `cancelReason` berdasarkan actor/status.
+- Rule chat `write` belum memastikan `request.resource.data.senderId == request.auth.uid`; actor yang sudah boleh masuk ticket masih dapat menulis pesan dengan senderId palsu.
+- Rule ticket query/radar harus diuji karena Firestore query harus kompatibel dengan rule; hasil source code saja belum cukup.
+- Struktur `walletTransactions/{transactionId}` belum memiliki rule khusus karena collection tersebut belum terlihat dipakai konsisten oleh repository wallet.
+
+#### `mobile/lib/features/auth/bloc/auth_bloc.dart`
+
+Perubahan terkait sebelum fase ini:
+
+- Login Mitra memeriksa `verificationStatus` dan menolak status selain `verified` dengan pesan menunggu approval.
+- Login Mitra memeriksa suspend dan memberi pesan khusus.
+- Error Firebase seperti `invalid-credential`, `user-disabled`, dan `too-many-requests` dipetakan menjadi pesan user-friendly.
+
+#### `mobile/lib/features/auth/pages/tukang_onboarding_page.dart`
+
+Perubahan terkait sebelum fase ini:
+
+- Setelah register Mitra berhasil, AuthBloc di-sign out.
+- Halaman kembali ke login dan menampilkan notifikasi bahwa pendaftaran menunggu approval.
+
+#### `mobile/devtools_options.yaml`
+
+- File baru tidak terkait langsung dengan Fase 1-5 dan tampak sebagai file tooling Flutter yang tidak sengaja/generated.
+- Agent berikutnya harus memeriksa apakah file ini diperlukan. Jika tidak diperlukan dan bukan perubahan user, hapus sebelum commit; jangan menghapus tanpa memeriksa asalnya.
+
+### Validasi yang sudah dijalankan
+
+- `cd mobile && flutter analyze`: tidak ada error compile; masih ada 11 info/lint/deprecation yang tidak terkait langsung dengan fase ini.
+- `cd mobile && flutter test`: lulus `1` test, tetapi test yang ada masih test template/counter, bukan test Firestore atau ticket real.
+- `cd admin && npm run build`: berhasil.
+- `cd admin && npm run lint`: selesai dengan warning unused imports/purity/Fast Refresh.
+- `git diff --check`: tidak menemukan whitespace error.
+
+### Yang belum dilakukan dan wajib diselesaikan
+
+#### A. Deploy Rules
+
+1. Perbaiki/upgrade Firebase CLI lokal karena sebelumnya `firebase --version` gagal dengan `Cannot find module './flutter'`.
+2. Pastikan Firebase CLI login ke project `beress-app` yang benar.
+3. Pastikan project alias/default mengarah ke project yang benar.
+4. Jalankan:
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+5. Catat hasil deploy dan timestamp di laporan.
+
+Jangan menjalankan deploy dengan service-account JSON secara sembarangan. Credential admin hanya untuk script administratif, bukan untuk Flutter atau frontend.
+
+#### B. Rules test matrix
+
+Buat test menggunakan Firebase Emulator atau Firebase Rules Unit Testing untuk actor berikut:
+
+| Actor | Harus berhasil | Harus ditolak |
+|---|---|---|
+| User A | baca profile/ticket milik sendiri, create ticket OPEN, chat ticket sendiri | baca/update ticket User B, baca chat ticket User B, ubah role/paymentStatus |
+| User B | baca data milik sendiri | akses ticket User A |
+| Mitra pending | baca profile sendiri | radar, bid, akses ticket terbuka bila rule mensyaratkan verified |
+| Mitra verified | baca ticket OPEN/BIDDING yang relevan, update ticket yang ditugaskan, chat ticket terpilih | ubah KYC, wallet, suspension, ticket user lain tanpa penugasan |
+| Admin claim | baca semua data operasional, approve/reject KYC, update withdrawals | tidak ada penolakan operasional yang tidak diharapkan |
+| Anonymous | tidak ada akses Firestore | semua read/write |
+
+#### C. Ticket repository completion
+
+- Audit seluruh method di `ticket_repository_impl.dart` setelah line 520; pastikan tidak ada method yang masih langsung mengakses `_mockTickets` pada mode normal.
+- Ganti ID ticket dari timestamp substring dengan `doc()`/ID yang collision-safe bila diperlukan.
+- Pastikan create ticket gagal jika Firestore gagal; jangan mengembalikan sukses lokal.
+- Gunakan Firestore transaction untuk bid/lock/status yang bersaing agar dua mitra tidak dapat mengunci ticket yang sama.
+- Validasi actor/ownership di repository dan Rules, bukan hanya UI.
+- Pastikan query `getUserTickets()` benar-benar memakai `where('userId', isEqualTo: userId)`.
+- Pastikan query `getTukangTickets()` hanya mengembalikan ticket yang relevan dengan `selectedTukangId`.
+- Pastikan `paymentPending` dan `completed` hanya diubah melalui flow pembayaran backend ketika DOKU aktif; jangan memberi client kewenangan mengubah payment status.
+- Tambahkan test unit untuk seluruh transisi status legal/ilegal.
+
+#### D. Admin realtime completion
+
+- Pastikan `AdminDataProvider` hanya dipakai setelah Firebase Auth admin berhasil.
+- Tambahkan `loading/error/empty` state terpisah untuk setiap collection, bukan hanya array kosong.
+- Hentikan listener saat unmount dan pastikan error permission ditampilkan ke admin.
+- Normalizer tidak boleh mengubah data missing menjadi status aman/verified secara default.
+- Tambahkan `onSnapshot` untuk wallet transactions bila menu admin akan menampilkan ledger.
+- Pastikan KYC action mengubah dokumen dengan UID Firestore yang sama dengan UID Authentication.
+- Pastikan approve/reject tidak hanya mengubah status UI; verifikasi dengan refresh browser dan snapshot lain.
+- Hapus/disable `Reset Data Demo` di build production atau pastikan flag demo tidak dapat aktif tanpa konfigurasi eksplisit.
+
+#### E. Data migration/cleanup
+
+- Inventaris dokumen mock lama seperti `TCK-801`, `TCK-802`, `USR-001`, dan `TKG-001` sebelum menghapusnya.
+- Jangan menganggap ID mock sebagai UID Firebase.
+- Hapus atau migrasikan data demo hanya setelah backup/export.
+- Pastikan setiap `users/{uid}` dan `tukang/{uid}` memakai UID Authentication sebagai document ID.
+- Pastikan ticket lama memiliki `userId` dan `selectedTukangId` yang benar-benar menunjuk UID Firebase.
+
+#### F. End-to-end validation
+
+Urutan wajib:
+
+1. Register User dan pastikan `users/{uid}` terbentuk.
+2. User membuat ticket dan pastikan `tickets/{ticketId}` terbentuk.
+3. Register Mitra dan pastikan `tukang/{uid}` berstatus pending.
+4. Mitra pending tidak dapat radar/bid.
+5. Admin melihat Mitra/ticket/user realtime.
+6. Admin approve Mitra.
+7. Mitra login ulang dan dapat radar.
+8. Mitra submit bid; User melihat bid yang sama.
+9. User lock Mitra; Mitra lain tidak dapat lock ticket tersebut.
+10. Status ticket berpindah sesuai state machine dan terlihat pada User, Mitra, Admin.
+11. User A tidak dapat membaca ticket/chat User B.
+12. Admin refresh/browser restart dan data tetap berasal dari Firestore.
+13. Simulasikan permission denied/network error dan pastikan UI menampilkan error, bukan sukses palsu.
+
+### Risiko dan keputusan yang belum boleh dilewati
+
+- Rules belum dianggap aman sebelum deploy dan emulator test berhasil.
+- Firestore belum dianggap sumber tunggal sebelum semua method repository dan AdminDataContext lolos audit `_mockTickets`, `initial*List`, serta localStorage.
+- Status ticket belum dianggap konsisten sebelum update bersamaan diuji dengan transaction.
+- Admin realtime belum dianggap selesai hanya karena `onSnapshot` ada; harus diuji dengan akun admin claim dan refresh browser.
+- Payment/wallet tetap di luar penyelesaian Fase 1-5; DOKU belum aktif dan payment status harus tetap dikunci dari client.
+
+### Command handoff untuk agent berikutnya
+
+Mulai dari root repository:
+
+```bash
+cd /Users/mhmmddhimas/projectlatihan/beresapp
+git status --short
+git diff --check
+cd mobile && flutter analyze && flutter test
+cd ../admin && npm run build && npm run lint
+```
+
+Sebelum coding lanjutan, baca bagian `Handoff Implementasi Fase 1-5` ini dan verifikasi diff aktual. Jangan menganggap semua checklist “sudah selesai” hanya karena build berhasil; deploy rules, rules test, migration, transaction, dan E2E masih terbuka.

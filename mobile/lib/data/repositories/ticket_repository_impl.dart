@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import '../../core/services/supabase_storage_service.dart';
 import '../../domain/entities/ticket_status.dart';
 import '../../domain/repositories/ticket_repository.dart';
@@ -8,13 +7,27 @@ import '../models/ticket_model.dart';
 
 class TicketRepositoryImpl implements TicketRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static const bool _demoMode = bool.fromEnvironment('BERES_DEMO_MODE', defaultValue: false);
 
   Future<void> _syncToFirestore(TicketModel ticket) async {
-    try {
-      await _firestore.collection('tickets').doc(ticket.id).set(ticket.toMap(), SetOptions(merge: true));
-    } catch (e) {
-      debugPrint('Firestore sync note for ${ticket.id}: $e');
-    }
+    await _firestore.collection('tickets').doc(ticket.id).set(ticket.toMap(), SetOptions(merge: true));
+  }
+
+  bool _isValidStatusTransition(TicketStatus current, TicketStatus next) {
+    if (current == next) return true;
+    const transitions = {
+      TicketStatus.open: {TicketStatus.bidding, TicketStatus.canceled},
+      TicketStatus.bidding: {TicketStatus.locked, TicketStatus.canceled},
+      TicketStatus.locked: {TicketStatus.onTheWay, TicketStatus.canceled},
+      TicketStatus.onTheWay: {TicketStatus.arrived},
+      TicketStatus.arrived: {TicketStatus.inProgress},
+      TicketStatus.inProgress: {TicketStatus.workCompleted},
+      TicketStatus.workCompleted: {TicketStatus.paymentPending},
+      TicketStatus.paymentPending: {TicketStatus.completed},
+      TicketStatus.completed: <TicketStatus>{},
+      TicketStatus.canceled: <TicketStatus>{},
+    };
+    return transitions[current]?.contains(next) ?? false;
   }
 
   static final List<TicketModel> _mockTickets = [
@@ -203,8 +216,9 @@ class TicketRepositoryImpl implements TicketRepository {
       folder: 'tickets',
     );
 
+    final docRef = _firestore.collection('tickets').doc();
     final ticket = TicketModel(
-      id: 'TCK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+      id: docRef.id,
       userId: userId,
       userName: userName,
       category: category,
@@ -218,7 +232,10 @@ class TicketRepositoryImpl implements TicketRepository {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
-    _mockTickets.insert(0, ticket);
+
+    if (_demoMode) {
+      _mockTickets.insert(0, ticket);
+    }
     await _syncToFirestore(ticket);
     return ticket;
   }
@@ -231,35 +248,31 @@ class TicketRepositoryImpl implements TicketRepository {
     double radiusKm = 15.0,
     String? currentTukangId,
   }) async {
-    try {
-      final snapshot = await _firestore
-          .collection('tickets')
-          .where('status', whereIn: ['OPEN', 'BIDDING'])
-          .get();
-      for (final doc in snapshot.docs) {
-        final t = TicketModel.fromMap(doc.data(), doc.id);
-        final idx = _mockTickets.indexWhere((m) => m.id == t.id);
-        if (idx != -1) {
-          _mockTickets[idx] = t;
-        } else {
-          _mockTickets.insert(0, t);
-        }
-      }
-    } catch (e) {
-      debugPrint('Firestore getOpenTicketsForTukang fallback note: $e');
+    if (_demoMode) {
+      return _mockTickets.where((t) {
+        final isMatchingService = tukangServices.contains(t.category);
+        final isStillOpenForOthers = t.status == TicketStatus.open || t.status == TicketStatus.bidding;
+        final isMyLockedJob = (t.status == TicketStatus.locked || t.status == TicketStatus.onTheWay || t.status == TicketStatus.inProgress) &&
+            t.selectedTukangId == currentTukangId;
+        final isEligibleStatus = isStillOpenForOthers || isMyLockedJob;
+        final distanceKm = _calculateHaversineDistance(tukangLat, tukangLng, t.lat, t.lng);
+        return isMatchingService && isEligibleStatus && (distanceKm <= radiusKm);
+      }).toList();
     }
 
-    return _mockTickets.where((t) {
-      final isMatchingService = tukangServices.contains(t.category);
+    final snapshot = await _firestore
+        .collection('tickets')
+        .where('status', whereIn: ['OPEN', 'BIDDING'])
+        .get();
+    final tickets = snapshot.docs.map((doc) => TicketModel.fromMap(doc.data(), doc.id)).toList();
 
-      // Once locked by user for a specific tukang, hide it for all OTHER tukangs!
+    return tickets.where((t) {
+      final isMatchingService = tukangServices.contains(t.category);
       final isStillOpenForOthers = t.status == TicketStatus.open || t.status == TicketStatus.bidding;
       final isMyLockedJob = (t.status == TicketStatus.locked || t.status == TicketStatus.onTheWay || t.status == TicketStatus.inProgress) &&
           t.selectedTukangId == currentTukangId;
 
       final isEligibleStatus = isStillOpenForOthers || isMyLockedJob;
-
-      // Real distance calculation (Haversine formula in KM)
       final distanceKm = _calculateHaversineDistance(tukangLat, tukangLng, t.lat, t.lng);
       final isWithinRadius = distanceKm <= radiusKm;
 
@@ -286,50 +299,101 @@ class TicketRepositoryImpl implements TicketRepository {
     required double estimatedPrice,
     required String note,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 800));
-    final index = _mockTickets.indexWhere((t) => t.id == ticketId);
-    if (index == -1) throw Exception('Tiket tidak ditemukan');
+    if (_demoMode) {
+      final index = _mockTickets.indexWhere((ticket) => ticket.id == ticketId);
+      if (index == -1) throw Exception('Tiket tidak ditemukan');
+      final oldTicket = _mockTickets[index];
+      if (oldTicket.status != TicketStatus.open && oldTicket.status != TicketStatus.bidding) {
+        throw Exception('Tiket sudah tidak menerima penawaran');
+      }
+      final updatedBids = List<BidModel>.from(oldTicket.bids);
+      updatedBids.removeWhere((b) => b.tukangId == tukangId);
+      updatedBids.add(BidModel(
+        tukangId: tukangId,
+        tukangName: tukangName,
+        tukangPhoto: tukangPhoto,
+        tukangRating: tukangRating,
+        estimatedPrice: estimatedPrice,
+        note: note,
+        createdAt: DateTime.now(),
+      ));
+      final updatedTicket = TicketModel(
+        id: oldTicket.id,
+        userId: oldTicket.userId,
+        userName: oldTicket.userName,
+        category: oldTicket.category,
+        title: oldTicket.title,
+        description: oldTicket.description,
+        photoUrls: oldTicket.photoUrls,
+        address: oldTicket.address,
+        lat: oldTicket.lat,
+        lng: oldTicket.lng,
+        status: TicketStatus.bidding,
+        selectedTukangId: oldTicket.selectedTukangId,
+        selectedTukangName: oldTicket.selectedTukangName,
+        bids: updatedBids,
+        finalBill: oldTicket.finalBill,
+        beforePhotos: oldTicket.beforePhotos,
+        afterPhotos: oldTicket.afterPhotos,
+        paymentMethod: oldTicket.paymentMethod,
+        paymentStatus: oldTicket.paymentStatus,
+        createdAt: oldTicket.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      _mockTickets[index] = updatedTicket;
+      return updatedTicket;
+    }
 
-    final oldTicket = _mockTickets[index];
-    final updatedBids = List<BidModel>.from(oldTicket.bids);
-    updatedBids.removeWhere((b) => b.tukangId == tukangId);
-    updatedBids.add(BidModel(
-      tukangId: tukangId,
-      tukangName: tukangName,
-      tukangPhoto: tukangPhoto,
-      tukangRating: tukangRating,
-      estimatedPrice: estimatedPrice,
-      note: note,
-      createdAt: DateTime.now(),
-    ));
+    final docRef = _firestore.collection('tickets').doc(ticketId);
+    return await _firestore.runTransaction<TicketModel>((transaction) async {
+      final snapshot = await transaction.get(docRef);
+      if (!snapshot.exists || snapshot.data() == null) {
+        throw Exception('Tiket $ticketId tidak ditemukan');
+      }
+      final oldTicket = TicketModel.fromMap(snapshot.data()!, snapshot.id);
+      if (oldTicket.status != TicketStatus.open && oldTicket.status != TicketStatus.bidding) {
+        throw Exception('Tiket sudah tidak menerima penawaran (status: ${oldTicket.status.label})');
+      }
 
-    final updatedTicket = TicketModel(
-      id: oldTicket.id,
-      userId: oldTicket.userId,
-      userName: oldTicket.userName,
-      category: oldTicket.category,
-      title: oldTicket.title,
-      description: oldTicket.description,
-      photoUrls: oldTicket.photoUrls,
-      address: oldTicket.address,
-      lat: oldTicket.lat,
-      lng: oldTicket.lng,
-      status: TicketStatus.bidding,
-      selectedTukangId: oldTicket.selectedTukangId,
-      selectedTukangName: oldTicket.selectedTukangName,
-      bids: updatedBids,
-      finalBill: oldTicket.finalBill,
-      beforePhotos: oldTicket.beforePhotos,
-      afterPhotos: oldTicket.afterPhotos,
-      paymentMethod: oldTicket.paymentMethod,
-      paymentStatus: oldTicket.paymentStatus,
-      createdAt: oldTicket.createdAt,
-      updatedAt: DateTime.now(),
-    );
+      final updatedBids = List<BidModel>.from(oldTicket.bids);
+      updatedBids.removeWhere((b) => b.tukangId == tukangId);
+      updatedBids.add(BidModel(
+        tukangId: tukangId,
+        tukangName: tukangName,
+        tukangPhoto: tukangPhoto,
+        tukangRating: tukangRating,
+        estimatedPrice: estimatedPrice,
+        note: note,
+        createdAt: DateTime.now(),
+      ));
 
-    _mockTickets[index] = updatedTicket;
-    await _syncToFirestore(updatedTicket);
-    return updatedTicket;
+      final updatedTicket = TicketModel(
+        id: oldTicket.id,
+        userId: oldTicket.userId,
+        userName: oldTicket.userName,
+        category: oldTicket.category,
+        title: oldTicket.title,
+        description: oldTicket.description,
+        photoUrls: oldTicket.photoUrls,
+        address: oldTicket.address,
+        lat: oldTicket.lat,
+        lng: oldTicket.lng,
+        status: TicketStatus.bidding,
+        selectedTukangId: oldTicket.selectedTukangId,
+        selectedTukangName: oldTicket.selectedTukangName,
+        bids: updatedBids,
+        finalBill: oldTicket.finalBill,
+        beforePhotos: oldTicket.beforePhotos,
+        afterPhotos: oldTicket.afterPhotos,
+        paymentMethod: oldTicket.paymentMethod,
+        paymentStatus: oldTicket.paymentStatus,
+        createdAt: oldTicket.createdAt,
+        updatedAt: DateTime.now(),
+      );
+
+      transaction.update(docRef, updatedTicket.toMap());
+      return updatedTicket;
+    });
   }
 
   @override
@@ -338,37 +402,78 @@ class TicketRepositoryImpl implements TicketRepository {
     required String selectedTukangId,
     required String selectedTukangName,
   }) async {
-    final index = _mockTickets.indexWhere((t) => t.id == ticketId);
-    if (index == -1) throw Exception('Tiket tidak ditemukan');
+    if (_demoMode) {
+      final index = _mockTickets.indexWhere((ticket) => ticket.id == ticketId);
+      if (index == -1) throw Exception('Tiket tidak ditemukan');
+      final oldTicket = _mockTickets[index];
+      if (oldTicket.status != TicketStatus.open && oldTicket.status != TicketStatus.bidding) {
+        throw Exception('Tiket sudah tidak dapat dipilih mitranya');
+      }
+      final updatedTicket = TicketModel(
+        id: oldTicket.id,
+        userId: oldTicket.userId,
+        userName: oldTicket.userName,
+        category: oldTicket.category,
+        title: oldTicket.title,
+        description: oldTicket.description,
+        photoUrls: oldTicket.photoUrls,
+        address: oldTicket.address,
+        lat: oldTicket.lat,
+        lng: oldTicket.lng,
+        status: TicketStatus.locked,
+        selectedTukangId: selectedTukangId,
+        selectedTukangName: selectedTukangName,
+        bids: oldTicket.bids,
+        finalBill: oldTicket.finalBill,
+        beforePhotos: oldTicket.beforePhotos,
+        afterPhotos: oldTicket.afterPhotos,
+        paymentMethod: oldTicket.paymentMethod,
+        paymentStatus: oldTicket.paymentStatus,
+        createdAt: oldTicket.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      _mockTickets[index] = updatedTicket;
+      return updatedTicket;
+    }
 
-    final oldTicket = _mockTickets[index];
-    final updatedTicket = TicketModel(
-      id: oldTicket.id,
-      userId: oldTicket.userId,
-      userName: oldTicket.userName,
-      category: oldTicket.category,
-      title: oldTicket.title,
-      description: oldTicket.description,
-      photoUrls: oldTicket.photoUrls,
-      address: oldTicket.address,
-      lat: oldTicket.lat,
-      lng: oldTicket.lng,
-      status: TicketStatus.locked,
-      selectedTukangId: selectedTukangId,
-      selectedTukangName: selectedTukangName,
-      bids: oldTicket.bids,
-      finalBill: oldTicket.finalBill,
-      beforePhotos: oldTicket.beforePhotos,
-      afterPhotos: oldTicket.afterPhotos,
-      paymentMethod: oldTicket.paymentMethod,
-      paymentStatus: oldTicket.paymentStatus,
-      createdAt: oldTicket.createdAt,
-      updatedAt: DateTime.now(),
-    );
+    final docRef = _firestore.collection('tickets').doc(ticketId);
+    return await _firestore.runTransaction<TicketModel>((transaction) async {
+      final snapshot = await transaction.get(docRef);
+      if (!snapshot.exists || snapshot.data() == null) {
+        throw Exception('Tiket $ticketId tidak ditemukan');
+      }
+      final oldTicket = TicketModel.fromMap(snapshot.data()!, snapshot.id);
+      if (oldTicket.status != TicketStatus.open && oldTicket.status != TicketStatus.bidding) {
+        throw Exception('Tiket sudah tidak dapat dipilih mitranya (status: ${oldTicket.status.label})');
+      }
 
-    _mockTickets[index] = updatedTicket;
-    await _syncToFirestore(updatedTicket);
-    return updatedTicket;
+      final updatedTicket = TicketModel(
+        id: oldTicket.id,
+        userId: oldTicket.userId,
+        userName: oldTicket.userName,
+        category: oldTicket.category,
+        title: oldTicket.title,
+        description: oldTicket.description,
+        photoUrls: oldTicket.photoUrls,
+        address: oldTicket.address,
+        lat: oldTicket.lat,
+        lng: oldTicket.lng,
+        status: TicketStatus.locked,
+        selectedTukangId: selectedTukangId,
+        selectedTukangName: selectedTukangName,
+        bids: oldTicket.bids,
+        finalBill: oldTicket.finalBill,
+        beforePhotos: oldTicket.beforePhotos,
+        afterPhotos: oldTicket.afterPhotos,
+        paymentMethod: oldTicket.paymentMethod,
+        paymentStatus: oldTicket.paymentStatus,
+        createdAt: oldTicket.createdAt,
+        updatedAt: DateTime.now(),
+      );
+
+      transaction.update(docRef, updatedTicket.toMap());
+      return updatedTicket;
+    });
   }
 
   @override
@@ -377,38 +482,78 @@ class TicketRepositoryImpl implements TicketRepository {
     required TicketStatus newStatus,
     String? cancelReason,
   }) async {
-    final index = _mockTickets.indexWhere((t) => t.id == ticketId);
-    if (index == -1) throw Exception('Tiket tidak ditemukan');
+    if (_demoMode) {
+      final index = _mockTickets.indexWhere((ticket) => ticket.id == ticketId);
+      if (index == -1) throw Exception('Tiket tidak ditemukan');
+      final old = _mockTickets[index];
+      if (!_isValidStatusTransition(old.status, newStatus)) {
+        throw Exception('Perubahan status ${old.status.code} ke ${newStatus.code} tidak diizinkan');
+      }
+      final updated = TicketModel(
+        id: old.id,
+        userId: old.userId,
+        userName: old.userName,
+        category: old.category,
+        title: old.title,
+        description: old.description,
+        photoUrls: old.photoUrls,
+        address: old.address,
+        lat: old.lat,
+        lng: old.lng,
+        status: newStatus,
+        selectedTukangId: old.selectedTukangId,
+        selectedTukangName: old.selectedTukangName,
+        bids: old.bids,
+        finalBill: old.finalBill,
+        beforePhotos: old.beforePhotos,
+        afterPhotos: old.afterPhotos,
+        paymentMethod: old.paymentMethod,
+        paymentStatus: old.paymentStatus,
+        cancelReason: cancelReason ?? old.cancelReason,
+        createdAt: old.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      _mockTickets[index] = updated;
+      return updated;
+    }
 
-    final old = _mockTickets[index];
-    final updated = TicketModel(
-      id: old.id,
-      userId: old.userId,
-      userName: old.userName,
-      category: old.category,
-      title: old.title,
-      description: old.description,
-      photoUrls: old.photoUrls,
-      address: old.address,
-      lat: old.lat,
-      lng: old.lng,
-      status: newStatus,
-      selectedTukangId: old.selectedTukangId,
-      selectedTukangName: old.selectedTukangName,
-      bids: old.bids,
-      finalBill: old.finalBill,
-      beforePhotos: old.beforePhotos,
-      afterPhotos: old.afterPhotos,
-      paymentMethod: old.paymentMethod,
-      paymentStatus: old.paymentStatus,
-      cancelReason: cancelReason ?? old.cancelReason,
-      createdAt: old.createdAt,
-      updatedAt: DateTime.now(),
-    );
-
-    _mockTickets[index] = updated;
-    await _syncToFirestore(updated);
-    return updated;
+    final docRef = _firestore.collection('tickets').doc(ticketId);
+    return await _firestore.runTransaction<TicketModel>((transaction) async {
+      final snapshot = await transaction.get(docRef);
+      if (!snapshot.exists || snapshot.data() == null) {
+        throw Exception('Tiket $ticketId tidak ditemukan');
+      }
+      final old = TicketModel.fromMap(snapshot.data()!, snapshot.id);
+      if (!_isValidStatusTransition(old.status, newStatus)) {
+        throw Exception('Perubahan status ${old.status.code} ke ${newStatus.code} tidak diizinkan');
+      }
+      final updated = TicketModel(
+        id: old.id,
+        userId: old.userId,
+        userName: old.userName,
+        category: old.category,
+        title: old.title,
+        description: old.description,
+        photoUrls: old.photoUrls,
+        address: old.address,
+        lat: old.lat,
+        lng: old.lng,
+        status: newStatus,
+        selectedTukangId: old.selectedTukangId,
+        selectedTukangName: old.selectedTukangName,
+        bids: old.bids,
+        finalBill: old.finalBill,
+        beforePhotos: old.beforePhotos,
+        afterPhotos: old.afterPhotos,
+        paymentMethod: old.paymentMethod,
+        paymentStatus: old.paymentStatus,
+        cancelReason: cancelReason ?? old.cancelReason,
+        createdAt: old.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      transaction.update(docRef, updated.toMap());
+      return updated;
+    });
   }
 
   @override
@@ -416,13 +561,7 @@ class TicketRepositoryImpl implements TicketRepository {
     required String ticketId,
     required List<BillItem> items,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 800));
-    final index = _mockTickets.indexWhere((t) => t.id == ticketId);
-    if (index == -1) throw Exception('Tiket tidak ditemukan');
-
-    final old = _mockTickets[index];
-    final double total = items.fold(0, (sum, item) => sum + item.amount);
-
+    final double total = items.fold(0, (totalAcc, item) => totalAcc + item.amount);
     final finalBill = FinalBill(
       items: items,
       totalAmount: total,
@@ -430,78 +569,152 @@ class TicketRepositoryImpl implements TicketRepository {
       createdAt: DateTime.now(),
     );
 
-    final updated = TicketModel(
-      id: old.id,
-      userId: old.userId,
-      userName: old.userName,
-      category: old.category,
-      title: old.title,
-      description: old.description,
-      photoUrls: old.photoUrls,
-      address: old.address,
-      lat: old.lat,
-      lng: old.lng,
-      status: old.status,
-      selectedTukangId: old.selectedTukangId,
-      selectedTukangName: old.selectedTukangName,
-      bids: old.bids,
-      finalBill: finalBill,
-      beforePhotos: old.beforePhotos,
-      afterPhotos: old.afterPhotos,
-      paymentMethod: old.paymentMethod,
-      paymentStatus: old.paymentStatus,
-      createdAt: old.createdAt,
-      updatedAt: DateTime.now(),
-    );
+    if (_demoMode) {
+      final index = _mockTickets.indexWhere((ticket) => ticket.id == ticketId);
+      if (index == -1) throw Exception('Tiket tidak ditemukan');
+      final old = _mockTickets[index];
+      final updated = TicketModel(
+        id: old.id,
+        userId: old.userId,
+        userName: old.userName,
+        category: old.category,
+        title: old.title,
+        description: old.description,
+        photoUrls: old.photoUrls,
+        address: old.address,
+        lat: old.lat,
+        lng: old.lng,
+        status: old.status,
+        selectedTukangId: old.selectedTukangId,
+        selectedTukangName: old.selectedTukangName,
+        bids: old.bids,
+        finalBill: finalBill,
+        beforePhotos: old.beforePhotos,
+        afterPhotos: old.afterPhotos,
+        paymentMethod: old.paymentMethod,
+        paymentStatus: old.paymentStatus,
+        createdAt: old.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      _mockTickets[index] = updated;
+      return updated;
+    }
 
-    _mockTickets[index] = updated;
-    await _syncToFirestore(updated);
-    return updated;
+    final docRef = _firestore.collection('tickets').doc(ticketId);
+    return await _firestore.runTransaction<TicketModel>((transaction) async {
+      final snapshot = await transaction.get(docRef);
+      if (!snapshot.exists || snapshot.data() == null) {
+        throw Exception('Tiket $ticketId tidak ditemukan');
+      }
+      final old = TicketModel.fromMap(snapshot.data()!, snapshot.id);
+      final updated = TicketModel(
+        id: old.id,
+        userId: old.userId,
+        userName: old.userName,
+        category: old.category,
+        title: old.title,
+        description: old.description,
+        photoUrls: old.photoUrls,
+        address: old.address,
+        lat: old.lat,
+        lng: old.lng,
+        status: old.status,
+        selectedTukangId: old.selectedTukangId,
+        selectedTukangName: old.selectedTukangName,
+        bids: old.bids,
+        finalBill: finalBill,
+        beforePhotos: old.beforePhotos,
+        afterPhotos: old.afterPhotos,
+        paymentMethod: old.paymentMethod,
+        paymentStatus: old.paymentStatus,
+        createdAt: old.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      transaction.update(docRef, updated.toMap());
+      return updated;
+    });
   }
 
   @override
   Future<TicketModel> approveFinalBill({required String ticketId}) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    final index = _mockTickets.indexWhere((t) => t.id == ticketId);
-    if (index == -1) throw Exception('Tiket tidak ditemukan');
+    if (_demoMode) {
+      final index = _mockTickets.indexWhere((ticket) => ticket.id == ticketId);
+      if (index == -1) throw Exception('Tiket tidak ditemukan');
+      final old = _mockTickets[index];
+      if (old.finalBill == null) throw Exception('Tagihan belum diinput oleh tukang');
+      final updatedBill = FinalBill(
+        items: old.finalBill!.items,
+        totalAmount: old.finalBill!.totalAmount,
+        approvedByUser: true,
+        createdAt: old.finalBill!.createdAt,
+      );
+      final updated = TicketModel(
+        id: old.id,
+        userId: old.userId,
+        userName: old.userName,
+        category: old.category,
+        title: old.title,
+        description: old.description,
+        photoUrls: old.photoUrls,
+        address: old.address,
+        lat: old.lat,
+        lng: old.lng,
+        status: old.status,
+        selectedTukangId: old.selectedTukangId,
+        selectedTukangName: old.selectedTukangName,
+        bids: old.bids,
+        finalBill: updatedBill,
+        beforePhotos: old.beforePhotos,
+        afterPhotos: old.afterPhotos,
+        paymentMethod: old.paymentMethod,
+        paymentStatus: old.paymentStatus,
+        createdAt: old.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      _mockTickets[index] = updated;
+      return updated;
+    }
 
-    final old = _mockTickets[index];
-    if (old.finalBill == null) throw Exception('Tagihan belum diinput oleh tukang');
-
-    final updatedBill = FinalBill(
-      items: old.finalBill!.items,
-      totalAmount: old.finalBill!.totalAmount,
-      approvedByUser: true,
-      createdAt: old.finalBill!.createdAt,
-    );
-
-    final updated = TicketModel(
-      id: old.id,
-      userId: old.userId,
-      userName: old.userName,
-      category: old.category,
-      title: old.title,
-      description: old.description,
-      photoUrls: old.photoUrls,
-      address: old.address,
-      lat: old.lat,
-      lng: old.lng,
-      status: old.status,
-      selectedTukangId: old.selectedTukangId,
-      selectedTukangName: old.selectedTukangName,
-      bids: old.bids,
-      finalBill: updatedBill,
-      beforePhotos: old.beforePhotos,
-      afterPhotos: old.afterPhotos,
-      paymentMethod: old.paymentMethod,
-      paymentStatus: old.paymentStatus,
-      createdAt: old.createdAt,
-      updatedAt: DateTime.now(),
-    );
-
-    _mockTickets[index] = updated;
-    await _syncToFirestore(updated);
-    return updated;
+    final docRef = _firestore.collection('tickets').doc(ticketId);
+    return await _firestore.runTransaction<TicketModel>((transaction) async {
+      final snapshot = await transaction.get(docRef);
+      if (!snapshot.exists || snapshot.data() == null) {
+        throw Exception('Tiket $ticketId tidak ditemukan');
+      }
+      final old = TicketModel.fromMap(snapshot.data()!, snapshot.id);
+      if (old.finalBill == null) throw Exception('Tagihan belum diinput oleh tukang');
+      final updatedBill = FinalBill(
+        items: old.finalBill!.items,
+        totalAmount: old.finalBill!.totalAmount,
+        approvedByUser: true,
+        createdAt: old.finalBill!.createdAt,
+      );
+      final updated = TicketModel(
+        id: old.id,
+        userId: old.userId,
+        userName: old.userName,
+        category: old.category,
+        title: old.title,
+        description: old.description,
+        photoUrls: old.photoUrls,
+        address: old.address,
+        lat: old.lat,
+        lng: old.lng,
+        status: old.status,
+        selectedTukangId: old.selectedTukangId,
+        selectedTukangName: old.selectedTukangName,
+        bids: old.bids,
+        finalBill: updatedBill,
+        beforePhotos: old.beforePhotos,
+        afterPhotos: old.afterPhotos,
+        paymentMethod: old.paymentMethod,
+        paymentStatus: old.paymentStatus,
+        createdAt: old.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      transaction.update(docRef, updated.toMap());
+      return updated;
+    });
   }
 
   @override
@@ -510,119 +723,104 @@ class TicketRepositoryImpl implements TicketRepository {
     required bool isBefore,
     required List<String> photoPaths,
   }) async {
-    final index = _mockTickets.indexWhere((t) => t.id == ticketId);
-    if (index == -1) throw Exception('Tiket tidak ditemukan');
-
-    // Upload work photos to Supabase Storage
     final uploadedUrls = await SupabaseStorageService.uploadMultipleImages(
       filePaths: photoPaths,
       folder: 'work_photos',
     );
 
-    final old = _mockTickets[index];
-    final updated = TicketModel(
-      id: old.id,
-      userId: old.userId,
-      userName: old.userName,
-      category: old.category,
-      title: old.title,
-      description: old.description,
-      photoUrls: old.photoUrls,
-      address: old.address,
-      lat: old.lat,
-      lng: old.lng,
-      status: old.status,
-      selectedTukangId: old.selectedTukangId,
-      selectedTukangName: old.selectedTukangName,
-      bids: old.bids,
-      finalBill: old.finalBill,
-      beforePhotos: isBefore ? uploadedUrls : old.beforePhotos,
-      afterPhotos: !isBefore ? uploadedUrls : old.afterPhotos,
-      paymentMethod: old.paymentMethod,
-      paymentStatus: old.paymentStatus,
-      createdAt: old.createdAt,
-      updatedAt: DateTime.now(),
-    );
+    if (_demoMode) {
+      final index = _mockTickets.indexWhere((ticket) => ticket.id == ticketId);
+      if (index == -1) throw Exception('Tiket tidak ditemukan');
+      final old = _mockTickets[index];
+      final updated = TicketModel(
+        id: old.id,
+        userId: old.userId,
+        userName: old.userName,
+        category: old.category,
+        title: old.title,
+        description: old.description,
+        photoUrls: old.photoUrls,
+        address: old.address,
+        lat: old.lat,
+        lng: old.lng,
+        status: old.status,
+        selectedTukangId: old.selectedTukangId,
+        selectedTukangName: old.selectedTukangName,
+        bids: old.bids,
+        finalBill: old.finalBill,
+        beforePhotos: isBefore ? uploadedUrls : old.beforePhotos,
+        afterPhotos: !isBefore ? uploadedUrls : old.afterPhotos,
+        paymentMethod: old.paymentMethod,
+        paymentStatus: old.paymentStatus,
+        createdAt: old.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      _mockTickets[index] = updated;
+      return updated;
+    }
 
-    _mockTickets[index] = updated;
-    await _syncToFirestore(updated);
-    return updated;
+    final docRef = _firestore.collection('tickets').doc(ticketId);
+    return await _firestore.runTransaction<TicketModel>((transaction) async {
+      final snapshot = await transaction.get(docRef);
+      if (!snapshot.exists || snapshot.data() == null) {
+        throw Exception('Tiket $ticketId tidak ditemukan');
+      }
+      final old = TicketModel.fromMap(snapshot.data()!, snapshot.id);
+      final updated = TicketModel(
+        id: old.id,
+        userId: old.userId,
+        userName: old.userName,
+        category: old.category,
+        title: old.title,
+        description: old.description,
+        photoUrls: old.photoUrls,
+        address: old.address,
+        lat: old.lat,
+        lng: old.lng,
+        status: old.status,
+        selectedTukangId: old.selectedTukangId,
+        selectedTukangName: old.selectedTukangName,
+        bids: old.bids,
+        finalBill: old.finalBill,
+        beforePhotos: isBefore ? uploadedUrls : old.beforePhotos,
+        afterPhotos: !isBefore ? uploadedUrls : old.afterPhotos,
+        paymentMethod: old.paymentMethod,
+        paymentStatus: old.paymentStatus,
+        createdAt: old.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      transaction.update(docRef, updated.toMap());
+      return updated;
+    });
   }
 
   @override
   Future<List<TicketModel>> getUserTickets(String userId) async {
-    try {
-      final snapshot = await _firestore
-          .collection('tickets')
-          .where('userId', isEqualTo: userId)
-          .get();
-      if (snapshot.docs.isNotEmpty) {
-        final cloudTickets = snapshot.docs
-            .map((doc) => TicketModel.fromMap(doc.data(), doc.id))
-            .toList();
-        for (final ct in cloudTickets) {
-          final idx = _mockTickets.indexWhere((m) => m.id == ct.id);
-          if (idx != -1) {
-            _mockTickets[idx] = ct;
-          } else {
-            _mockTickets.add(ct);
-          }
-        }
-      }
-    } catch (_) {
-      // Fallback silently
+    if (_demoMode) {
+      return _mockTickets.where((t) => t.userId == userId).toList();
     }
-    return _mockTickets.where((t) => t.userId == userId).toList();
+    final snapshot = await _firestore.collection('tickets').where('userId', isEqualTo: userId).get();
+    return snapshot.docs.map((doc) => TicketModel.fromMap(doc.data(), doc.id)).toList();
   }
 
   @override
   Future<List<TicketModel>> getTukangTickets(String tukangId) async {
-    try {
-      final snapshot = await _firestore
-          .collection('tickets')
-          .where('selectedTukangId', isEqualTo: tukangId)
-          .get();
-      if (snapshot.docs.isNotEmpty) {
-        final cloudTickets = snapshot.docs
-            .map((doc) => TicketModel.fromMap(doc.data(), doc.id))
-            .toList();
-        for (final ct in cloudTickets) {
-          final idx = _mockTickets.indexWhere((m) => m.id == ct.id);
-          if (idx != -1) {
-            _mockTickets[idx] = ct;
-          } else {
-            _mockTickets.add(ct);
-          }
-        }
-      }
-    } catch (_) {
-      // Fallback silently
+    if (_demoMode) {
+      return _mockTickets.where((t) => t.selectedTukangId == tukangId).toList();
     }
-    return _mockTickets.where((t) => t.selectedTukangId == tukangId || t.bids.any((b) => b.tukangId == tukangId)).toList();
+    final snapshot = await _firestore.collection('tickets').where('selectedTukangId', isEqualTo: tukangId).get();
+    return snapshot.docs.map((doc) => TicketModel.fromMap(doc.data(), doc.id)).toList();
   }
 
   @override
   Future<TicketModel?> getTicketById(String ticketId) async {
-    try {
-      final doc = await _firestore.collection('tickets').doc(ticketId).get();
-      if (doc.exists && doc.data() != null) {
-        final cloudTicket = TicketModel.fromMap(doc.data()!, doc.id);
-        final idx = _mockTickets.indexWhere((t) => t.id == ticketId);
-        if (idx != -1) {
-          _mockTickets[idx] = cloudTicket;
-        } else {
-          _mockTickets.add(cloudTicket);
-        }
-        return cloudTicket;
-      }
-    } catch (_) {
-      // Fallback to cache
+    if (_demoMode) {
+      final index = _mockTickets.indexWhere((ticket) => ticket.id == ticketId);
+      if (index != -1) return _mockTickets[index];
     }
-    try {
-      return _mockTickets.firstWhere((t) => t.id == ticketId);
-    } catch (_) {
-      return null;
-    }
+    final snapshot = await _firestore.collection('tickets').doc(ticketId).get();
+    if (!snapshot.exists || snapshot.data() == null) return null;
+    return TicketModel.fromMap(snapshot.data()!, snapshot.id);
   }
 
   @override
@@ -631,41 +829,77 @@ class TicketRepositoryImpl implements TicketRepository {
     required int stars,
     required String review,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    final index = _mockTickets.indexWhere((t) => t.id == ticketId);
-    if (index == -1) throw Exception('Ticket $ticketId not found');
+    if (_demoMode) {
+      final index = _mockTickets.indexWhere((ticket) => ticket.id == ticketId);
+      if (index == -1) throw Exception('Tiket tidak ditemukan');
+      final old = _mockTickets[index];
+      final updated = TicketModel(
+        id: old.id,
+        userId: old.userId,
+        userName: old.userName,
+        category: old.category,
+        title: old.title,
+        description: old.description,
+        photoUrls: old.photoUrls,
+        address: old.address,
+        lat: old.lat,
+        lng: old.lng,
+        status: old.status,
+        selectedTukangId: old.selectedTukangId,
+        selectedTukangName: old.selectedTukangName,
+        bids: old.bids,
+        finalBill: old.finalBill,
+        beforePhotos: old.beforePhotos,
+        afterPhotos: old.afterPhotos,
+        paymentMethod: old.paymentMethod,
+        paymentStatus: old.paymentStatus,
+        dokuInvoiceId: old.dokuInvoiceId,
+        ratingStars: stars,
+        ratingReview: review,
+        cancelReason: old.cancelReason,
+        createdAt: old.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      _mockTickets[index] = updated;
+      return updated;
+    }
 
-    final old = _mockTickets[index];
-    final updated = TicketModel(
-      id: old.id,
-      userId: old.userId,
-      userName: old.userName,
-      category: old.category,
-      title: old.title,
-      description: old.description,
-      photoUrls: old.photoUrls,
-      address: old.address,
-      lat: old.lat,
-      lng: old.lng,
-      status: old.status,
-      selectedTukangId: old.selectedTukangId,
-      selectedTukangName: old.selectedTukangName,
-      bids: old.bids,
-      finalBill: old.finalBill,
-      beforePhotos: old.beforePhotos,
-      afterPhotos: old.afterPhotos,
-      paymentMethod: old.paymentMethod,
-      paymentStatus: old.paymentStatus,
-      dokuInvoiceId: old.dokuInvoiceId,
-      ratingStars: stars,
-      ratingReview: review,
-      cancelReason: old.cancelReason,
-      createdAt: old.createdAt,
-      updatedAt: DateTime.now(),
-    );
-
-    _mockTickets[index] = updated;
-    await _syncToFirestore(updated);
-    return updated;
+    final docRef = _firestore.collection('tickets').doc(ticketId);
+    return await _firestore.runTransaction<TicketModel>((transaction) async {
+      final snapshot = await transaction.get(docRef);
+      if (!snapshot.exists || snapshot.data() == null) {
+        throw Exception('Tiket $ticketId tidak ditemukan');
+      }
+      final old = TicketModel.fromMap(snapshot.data()!, snapshot.id);
+      final updated = TicketModel(
+        id: old.id,
+        userId: old.userId,
+        userName: old.userName,
+        category: old.category,
+        title: old.title,
+        description: old.description,
+        photoUrls: old.photoUrls,
+        address: old.address,
+        lat: old.lat,
+        lng: old.lng,
+        status: old.status,
+        selectedTukangId: old.selectedTukangId,
+        selectedTukangName: old.selectedTukangName,
+        bids: old.bids,
+        finalBill: old.finalBill,
+        beforePhotos: old.beforePhotos,
+        afterPhotos: old.afterPhotos,
+        paymentMethod: old.paymentMethod,
+        paymentStatus: old.paymentStatus,
+        dokuInvoiceId: old.dokuInvoiceId,
+        ratingStars: stars,
+        ratingReview: review,
+        cancelReason: old.cancelReason,
+        createdAt: old.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      transaction.update(docRef, updated.toMap());
+      return updated;
+    });
   }
 }

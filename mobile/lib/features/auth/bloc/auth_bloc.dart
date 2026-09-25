@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../domain/repositories/auth_repository.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/models/tukang_model.dart';
@@ -80,7 +81,26 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoadingState());
     try {
       final tukang = await authRepository.loginTukangWithEmail(event.email, event.password);
+      if (tukang.verificationStatus != 'verified') {
+        await authRepository.signOut();
+        emit(const AuthFailureState('Harap tunggu, akun Anda belum aktif. Pendaftaran masih menunggu persetujuan admin.'));
+        return;
+      }
+      if (tukang.isCurrentlySuspended) {
+        await authRepository.signOut();
+        emit(const AuthFailureState('Akun Anda sedang disuspend dan belum dapat digunakan.'));
+        return;
+      }
       emit(TukangAuthenticatedState(tukang));
+    } on FirebaseAuthException catch (e) {
+      final message = switch (e.code) {
+        'invalid-credential' || 'wrong-password' || 'user-not-found' =>
+          'Email atau password Mitra salah. Pastikan akun terdaftar di project Firebase yang benar.',
+        'user-disabled' => 'Akun Mitra ini dinonaktifkan. Hubungi admin.',
+        'too-many-requests' => 'Terlalu banyak percobaan login. Coba lagi beberapa saat.',
+        _ => 'Login Mitra gagal: ${e.message ?? e.code}',
+      };
+      emit(AuthFailureState(message));
     } catch (e) {
       emit(AuthFailureState('Gagal login Mitra: ${e.toString()}'));
     }

@@ -63,7 +63,7 @@ const normalizeTukang = (docData, docId) => {
   return {
     ...docData,
     id: docId || docData.id,
-    verificationStatus: docData.verificationStatus || 'verified',
+    verificationStatus: docData.verificationStatus || 'pending_verification',
     statusText: docData.statusText || (docData.isOnline ? 'Online / Siap Kerja' : 'Offline'),
     services: docData.services || [],
     payoutAccounts: docData.payoutAccounts || [],
@@ -74,11 +74,8 @@ const normalizeTukang = (docData, docId) => {
   };
 };
 
-const mergeTickets = (cloudDocs, fallbackList) => {
+const mergeTickets = (cloudDocs) => {
   const mergedMap = new Map();
-  for (const item of fallbackList) {
-    mergedMap.set(item.id, item);
-  }
   for (const item of cloudDocs) {
     mergedMap.set(item.id, normalizeTicket(item, item.id));
   }
@@ -89,11 +86,8 @@ const mergeTickets = (cloudDocs, fallbackList) => {
   });
 };
 
-const mergeTukang = (cloudDocs, fallbackList) => {
+const mergeTukang = (cloudDocs) => {
   const mergedMap = new Map();
-  for (const item of fallbackList) {
-    mergedMap.set(item.id, item);
-  }
   for (const item of cloudDocs) {
     mergedMap.set(item.id, normalizeTukang(item, item.id));
   }
@@ -137,11 +131,8 @@ const normalizeWithdrawal = (docData, docId) => {
   };
 };
 
-const mergeWithdrawals = (cloudDocs, fallbackList) => {
+const mergeWithdrawals = (cloudDocs) => {
   const mergedMap = new Map();
-  for (const item of fallbackList) {
-    mergedMap.set(item.id, normalizeWithdrawal(item, item.id));
-  }
   for (const item of cloudDocs) {
     mergedMap.set(item.id, normalizeWithdrawal(item, item.id));
   }
@@ -153,24 +144,35 @@ const mergeWithdrawals = (cloudDocs, fallbackList) => {
 };
 
 export function AdminDataProvider({ children }) {
+  const demoMode = import.meta.env.VITE_BERES_DEMO_MODE === 'true';
   const [tukangList, setTukangList] = useState(() => {
-    const saved = localStorage.getItem('beres_admin_tukang');
-    return saved ? JSON.parse(saved) : initialTukangList;
+    return demoMode ? initialTukangList : [];
   });
 
   const [usersList, setUsersList] = useState(() => {
-    const saved = localStorage.getItem('beres_admin_users');
-    return saved ? JSON.parse(saved) : initialUsersList;
+    return demoMode ? initialUsersList : [];
   });
 
   const [ticketsList, setTicketsList] = useState(() => {
-    const saved = localStorage.getItem('beres_admin_tickets');
-    return saved ? JSON.parse(saved) : initialTicketsList;
+    return demoMode ? initialTicketsList : [];
   });
 
   const [withdrawalsList, setWithdrawalsList] = useState(() => {
-    const saved = localStorage.getItem('beres_admin_withdrawals');
-    return saved ? JSON.parse(saved) : initialWithdrawalsList;
+    return demoMode ? initialWithdrawalsList : [];
+  });
+
+  const [dataLoading, setDataLoading] = useState({
+    tickets: !demoMode,
+    tukang: !demoMode,
+    withdrawals: !demoMode,
+    users: !demoMode,
+  });
+
+  const [dataErrors, setDataErrors] = useState({
+    tickets: null,
+    tukang: null,
+    withdrawals: null,
+    users: null,
   });
 
   const [toast, setToast] = useState(null);
@@ -189,15 +191,25 @@ export function AdminDataProvider({ children }) {
     try {
       unsubscribe = onSnapshot(collection(db, 'tickets'), (snapshot) => {
         setIsLiveConnected(true);
+        setDataLoading(prev => ({ ...prev, tickets: false }));
+        setDataErrors(prev => ({ ...prev, tickets: null }));
         if (!snapshot.empty) {
           const docs = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
-          setTicketsList(() => mergeTickets(docs, initialTicketsList));
+          setTicketsList(() => mergeTickets(docs));
+        } else {
+          setTicketsList([]);
         }
       }, (error) => {
         console.warn('Firestore tickets realtime listener notice:', error);
+        setDataLoading(prev => ({ ...prev, tickets: false }));
+        setDataErrors(prev => ({ ...prev, tickets: error.message }));
       });
     } catch (e) {
       console.warn('Firestore tickets setup notice:', e);
+      setTimeout(() => {
+        setDataLoading(prev => ({ ...prev, tickets: false }));
+        setDataErrors(prev => ({ ...prev, tickets: e.message }));
+      }, 0);
     }
     return () => unsubscribe && unsubscribe();
   }, []);
@@ -208,15 +220,25 @@ export function AdminDataProvider({ children }) {
     try {
       unsubscribe = onSnapshot(collection(db, 'tukang'), (snapshot) => {
         setIsLiveConnected(true);
+        setDataLoading(prev => ({ ...prev, tukang: false }));
+        setDataErrors(prev => ({ ...prev, tukang: null }));
         if (!snapshot.empty) {
           const docs = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
-          setTukangList(() => mergeTukang(docs, initialTukangList));
+          setTukangList(() => mergeTukang(docs));
+        } else {
+          setTukangList([]);
         }
       }, (error) => {
         console.warn('Firestore tukang realtime listener notice:', error);
+        setDataLoading(prev => ({ ...prev, tukang: false }));
+        setDataErrors(prev => ({ ...prev, tukang: error.message }));
       });
     } catch (e) {
       console.warn('Firestore tukang setup notice:', e);
+      setTimeout(() => {
+        setDataLoading(prev => ({ ...prev, tukang: false }));
+        setDataErrors(prev => ({ ...prev, tukang: e.message }));
+      }, 0);
     }
     return () => unsubscribe && unsubscribe();
   }, []);
@@ -227,82 +249,72 @@ export function AdminDataProvider({ children }) {
     try {
       unsubscribe = onSnapshot(collection(db, 'withdrawals'), (snapshot) => {
         setIsLiveConnected(true);
+        setDataLoading(prev => ({ ...prev, withdrawals: false }));
+        setDataErrors(prev => ({ ...prev, withdrawals: null }));
         if (!snapshot.empty) {
           const docs = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
-          setWithdrawalsList(() => mergeWithdrawals(docs, initialWithdrawalsList));
+          setWithdrawalsList(() => mergeWithdrawals(docs));
+        } else {
+          setWithdrawalsList([]);
         }
       }, (error) => {
         console.warn('Firestore withdrawals realtime listener notice:', error);
+        setDataLoading(prev => ({ ...prev, withdrawals: false }));
+        setDataErrors(prev => ({ ...prev, withdrawals: error.message }));
       });
     } catch (e) {
       console.warn('Firestore withdrawals setup notice:', e);
+      setTimeout(() => {
+        setDataLoading(prev => ({ ...prev, withdrawals: false }));
+        setDataErrors(prev => ({ ...prev, withdrawals: e.message }));
+      }, 0);
     }
     return () => unsubscribe && unsubscribe();
   }, []);
 
-  // Save to local cache
+  // 4. Sync users from Cloud Firestore in realtime
   useEffect(() => {
-    localStorage.setItem('beres_admin_tukang', JSON.stringify(tukangList));
-  }, [tukangList]);
+    let unsubscribe;
+    try {
+      unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
+        setIsLiveConnected(true);
+        setDataLoading(prev => ({ ...prev, users: false }));
+        setDataErrors(prev => ({ ...prev, users: null }));
+        setUsersList(snapshot.docs.map((item) => ({ ...item.data(), id: item.id })));
+      }, (error) => {
+        console.warn('Firestore users realtime listener notice:', error);
+        setDataLoading(prev => ({ ...prev, users: false }));
+        setDataErrors(prev => ({ ...prev, users: error.message }));
+      });
+    } catch (e) {
+      console.warn('Firestore users setup notice:', e);
+      setTimeout(() => {
+        setDataLoading(prev => ({ ...prev, users: false }));
+        setDataErrors(prev => ({ ...prev, users: e.message }));
+      }, 0);
+    }
+    return () => unsubscribe && unsubscribe();
+  }, []);
 
-  useEffect(() => {
-    localStorage.setItem('beres_admin_users', JSON.stringify(usersList));
-  }, [usersList]);
-
-  useEffect(() => {
-    localStorage.setItem('beres_admin_tickets', JSON.stringify(ticketsList));
-  }, [ticketsList]);
-
-  useEffect(() => {
-    localStorage.setItem('beres_admin_withdrawals', JSON.stringify(withdrawalsList));
-  }, [withdrawalsList]);
-
-  // KYC Approval: update state and Firestore
+  // KYC Approval: update Firestore with real data
   const approveKyc = async (tukangId) => {
-    setTukangList(prev => prev.map(t => {
-      if (t.id === tukangId) {
-        return {
-          ...t,
-          verificationStatus: 'verified',
-          statusText: 'Online / Siap Kerja',
-          isOnline: true,
-          rejectionReason: null
-        };
-      }
-      return t;
-    }));
-
     try {
       await setDoc(doc(db, 'tukang', tukangId), {
         verificationStatus: 'verified',
-        statusText: 'Online / Siap Kerja',
-        isOnline: true,
+        statusText: 'Terverifikasi',
         rejectionReason: null,
         updatedAt: new Date().toISOString()
       }, { merge: true });
+      showToast(`Pendaftaran Mitra #${tukangId} berhasil disetujui. Akun mitra aktif!`);
     } catch (e) {
       console.warn('Firestore approveKyc error:', e);
+      showToast('Gagal menyetujui pendaftaran mitra. Coba lagi.', 'error');
     }
-
-    showToast(`Pendaftaran Mitra #${tukangId} berhasil disetujui. Akun mitra aktif!`);
   };
 
-  // KYC Rejection: update state and Firestore
+  // KYC Rejection: update Firestore with reason
   const rejectKyc = async (tukangId, reason) => {
     const finalReason = reason || 'Keahlian atau kontak belum memenuhi kriteria.';
-    setTukangList(prev => prev.map(t => {
-      if (t.id === tukangId) {
-        return {
-          ...t,
-          verificationStatus: 'rejected',
-          statusText: 'Pendaftaran Ditolak',
-          isOnline: false,
-          rejectionReason: finalReason
-        };
-      }
-      return t;
-    }));
-
     try {
       await setDoc(doc(db, 'tukang', tukangId), {
         verificationStatus: 'rejected',
@@ -311,32 +323,18 @@ export function AdminDataProvider({ children }) {
         rejectionReason: finalReason,
         updatedAt: new Date().toISOString()
       }, { merge: true });
+      showToast(`Pendaftaran Mitra #${tukangId} ditolak. Notifikasi perbaikan dikirim.`, 'error');
     } catch (e) {
       console.warn('Firestore rejectKyc error:', e);
+      showToast('Gagal menolak pendaftaran mitra. Coba lagi.', 'error');
     }
-
-    showToast(`Pendaftaran Mitra #${tukangId} ditolak. Notifikasi perbaikan dikirim.`, 'error');
   };
 
-  // Suspend Tukang 3 Hari
+  // Suspend Tukang
   const suspendTukang = async (tukangId, reason, days = 3) => {
     const suspendDurationMs = days * 24 * 60 * 60 * 1000;
     const suspendedUntil = new Date(Date.now() + suspendDurationMs).toISOString();
     const finalReason = reason || 'Pelanggaran ketentuan layanan Beres';
-
-    setTukangList(prev => prev.map(t => {
-      if (t.id === tukangId) {
-        return {
-          ...t,
-          isSuspended: true,
-          suspendedUntil,
-          suspendReason: finalReason,
-          isOnline: false,
-          statusText: `Suspended (${days} Hari)`
-        };
-      }
-      return t;
-    }));
 
     try {
       await setDoc(doc(db, 'tukang', tukangId), {
@@ -347,61 +345,34 @@ export function AdminDataProvider({ children }) {
         statusText: `Suspended (${days} Hari)`,
         updatedAt: new Date().toISOString()
       }, { merge: true });
+      showToast(`Tukang #${tukangId} resmi disuspend selama ${days} hari!`, 'error');
     } catch (e) {
       console.warn('Firestore suspendTukang error:', e);
+      showToast('Gagal menerapkan suspend. Coba lagi.', 'error');
     }
-
-    showToast(`Tukang #${tukangId} resmi disuspend selama ${days} hari!`, 'error');
   };
 
-  // Lift Suspend Early (Cabut Suspend)
+  // Lift Suspend Early
   const unsuspendTukang = async (tukangId) => {
-    setTukangList(prev => prev.map(t => {
-      if (t.id === tukangId) {
-        return {
-          ...t,
-          isSuspended: false,
-          suspendedUntil: null,
-          suspendReason: null,
-          statusText: 'Online / Siap Kerja',
-          isOnline: true
-        };
-      }
-      return t;
-    }));
-
     try {
       await setDoc(doc(db, 'tukang', tukangId), {
         isSuspended: false,
         suspendedUntil: null,
         suspendReason: null,
-        statusText: 'Online / Siap Kerja',
-        isOnline: true,
+        statusText: 'Terverifikasi',
         updatedAt: new Date().toISOString()
       }, { merge: true });
+      showToast(`Sanksi suspend untuk Tukang #${tukangId} telah dicabut.`);
     } catch (e) {
       console.warn('Firestore unsuspendTukang error:', e);
+      showToast('Gagal mencabut suspend. Coba lagi.', 'error');
     }
-
-    showToast(`Sanksi suspend untuk Tukang #${tukangId} telah dicabut.`);
   };
 
-  // Approve Withdrawal: update state and Firestore
+  // Approve Withdrawal: update Firestore status
   const approveWithdrawal = async (withdrawId, adminNote) => {
     const note = adminNote || 'Disetujui dan ditransfer oleh Admin';
     const processedAt = new Date().toLocaleDateString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
-
-    setWithdrawalsList(prev => prev.map(w => {
-      if (w.id === withdrawId) {
-        return {
-          ...w,
-          status: 'approved',
-          processedAt,
-          adminNote: note
-        };
-      }
-      return w;
-    }));
 
     try {
       await setDoc(doc(db, 'withdrawals', withdrawId), {
@@ -410,43 +381,48 @@ export function AdminDataProvider({ children }) {
         adminNote: note,
         updatedAt: new Date().toISOString()
       }, { merge: true });
+      showToast(`Pencairan dana #${withdrawId} disetujui.`);
     } catch (e) {
       console.warn('Firestore approveWithdrawal error:', e);
+      showToast('Gagal memperbarui pencairan dana. Coba lagi.', 'error');
     }
-
-    showToast(`Pencairan dana #${withdrawId} disetujui.`);
   };
 
-  // Reject Withdrawal: update state and Firestore
+  // Reject Withdrawal: update Firestore and refund balance
   const rejectWithdrawal = async (withdrawId, reason) => {
     const note = reason || 'Rekening tujuan tidak valid / nama tidak sesuai';
 
-    setWithdrawalsList(prev => prev.map(w => {
-      if (w.id === withdrawId) {
-        return {
-          ...w,
-          status: 'rejected',
-          adminNote: note
-        };
-      }
-      return w;
-    }));
-
     try {
+      const withdrawal = withdrawalsList.find(w => w.id === withdrawId);
       await setDoc(doc(db, 'withdrawals', withdrawId), {
         status: 'rejected',
         adminNote: note,
         updatedAt: new Date().toISOString()
       }, { merge: true });
+
+      // Reversal: refund amount back to tukang wallet balance
+      if (withdrawal && withdrawal.tukangId && withdrawal.amount > 0) {
+        const tukangDoc = tukangList.find(t => t.id === withdrawal.tukangId);
+        const currentBal = Number(tukangDoc?.walletBalance) || 0;
+        await setDoc(doc(db, 'tukang', withdrawal.tukangId), {
+          walletBalance: currentBal + Number(withdrawal.amount),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+
+      showToast(`Pencairan dana #${withdrawId} ditolak. Saldo dikembalikan ke mitra.`, 'error');
     } catch (e) {
       console.warn('Firestore rejectWithdrawal error:', e);
+      showToast('Gagal menolak pencairan dana. Coba lagi.', 'error');
     }
-
-    showToast(`Pencairan dana #${withdrawId} ditolak.`, 'error');
   };
 
   // Reset to demo mock data
   const resetDemoData = () => {
+    if (!demoMode) {
+      showToast('Reset Data Demo hanya tersedia dalam mode demo.', 'error');
+      return;
+    }
     setTukangList(initialTukangList);
     setUsersList(initialUsersList);
     setTicketsList(initialTicketsList);
@@ -460,6 +436,8 @@ export function AdminDataProvider({ children }) {
       usersList,
       ticketsList,
       withdrawalsList,
+      dataLoading,
+      dataErrors,
       approveKyc,
       rejectKyc,
       suspendTukang,

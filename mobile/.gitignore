@@ -24,6 +24,7 @@ migrate_working_dir/
 .dart_tool/
 .flutter-plugins-dependencies
 .pub-cache/
+devtools_options.yaml
 .pub/
 /build/
 /coverage/
