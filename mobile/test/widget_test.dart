@@ -1,30 +1,31 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:beresapp/main.dart';
+import 'package:beresapp/core/widgets/gps_requirement_dialog.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('GpsRequirementDialog renders properly and responds to button tap', (WidgetTester tester) async {
+    bool accepted = false;
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: GpsRequirementDialog(
+            isTukang: true,
+            onAccepted: () {
+              accepted = true;
+            },
+          ),
+        ),
+      ),
+    );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    expect(find.text('Aktivasi GPS & Izin Lokasi Wajib'), findsOneWidget);
+    expect(find.text('Saya Mengerti & Sudah Aktifkan GPS'), findsOneWidget);
+    expect(find.byIcon(Icons.location_on_rounded), findsOneWidget);
+
+    await tester.tap(find.text('Saya Mengerti & Sudah Aktifkan GPS'));
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(accepted, isTrue);
   });
 }

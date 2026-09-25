@@ -383,7 +383,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                             Text(
                               hasExistingPin
                                   ? 'Verifikasi PIN saat ini terlebih dahulu'
-                                  : 'Wajib diatur untuk transaksi dompet & pembayaran',
+                                  : 'PIN keamanan 6-digit untuk konfirmasi transaksi',
                               style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
                             ),
                           ],
@@ -897,7 +897,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                     subtitle: Text(
                       _savedPin != null
                           ? 'PIN Aktif (6-digit) • Klik untuk verifikasi & ubah'
-                          : 'Belum Diatur • Wajib untuk transaksi & keamanan dompet',
+                          : 'Belum Diatur • Untuk verifikasi keamanan transaksi',
                       style: TextStyle(
                         fontSize: 11,
                         color: _savedPin != null ? AppColors.textMuted : AppColors.dangerRed,

@@ -27,114 +27,15 @@ class TukangProfilePage extends StatefulWidget {
 
 class _TukangProfilePageState extends State<TukangProfilePage> {
   late List<String> _services;
-  late List<PayoutAccount> _payoutAccounts;
   late double _workRadiusKm;
+  late bool _isOnline;
 
   @override
   void initState() {
     super.initState();
     _services = List<String>.from(widget.tukang.services);
-    _payoutAccounts = List<PayoutAccount>.from(widget.tukang.payoutAccounts);
     _workRadiusKm = widget.tukang.workRadiusKm;
-  }
-
-  LinearGradient _getProviderGradient(String provider) {
-    switch (provider.toUpperCase()) {
-      case 'BCA':
-        return const LinearGradient(
-          colors: [Color(0xFF003D79), Color(0xFF0066CC)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      case 'MANDIRI':
-        return const LinearGradient(
-          colors: [Color(0xFF002D62), Color(0xFF0B4E9E)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      case 'BRI':
-        return const LinearGradient(
-          colors: [Color(0xFF00529C), Color(0xFF007AE6)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      case 'BNI':
-        return const LinearGradient(
-          colors: [Color(0xFF005E6A), Color(0xFF00899B)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      case 'GOPAY':
-        return const LinearGradient(
-          colors: [Color(0xFF006C84), Color(0xFF00AA13)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      case 'OVO':
-        return const LinearGradient(
-          colors: [Color(0xFF4C2A86), Color(0xFF7A42C4)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      case 'DANA':
-        return const LinearGradient(
-          colors: [Color(0xFF108EE9), Color(0xFF1677FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      case 'SHOPEEPAY':
-        return const LinearGradient(
-          colors: [Color(0xFFEE4D2D), Color(0xFFFF6433)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      default:
-        return const LinearGradient(
-          colors: [Color(0xFF1E293B), Color(0xFF334155)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-    }
-  }
-
-  Color _getProviderShadowColor(String provider) {
-    switch (provider.toUpperCase()) {
-      case 'BCA':
-      case 'MANDIRI':
-      case 'BRI':
-      case 'BNI':
-        return const Color(0xFF00529C);
-      case 'GOPAY':
-        return const Color(0xFF00AA13);
-      case 'OVO':
-        return const Color(0xFF6B3BA7);
-      case 'DANA':
-        return const Color(0xFF108EE9);
-      case 'SHOPEEPAY':
-        return const Color(0xFFEE4D2D);
-      default:
-        return const Color(0xFF1E293B);
-    }
-  }
-
-  String _formatAccountNumber(String raw, String type) {
-    final clean = raw.replaceAll(RegExp(r'\s+'), '');
-    if (clean.isEmpty) return '•••• •••• •••• ••••';
-    if (type == 'bank') {
-      final buffer = StringBuffer();
-      for (int i = 0; i < clean.length; i++) {
-        if (i > 0 && i % 4 == 0) buffer.write(' ');
-        buffer.write(clean[i]);
-      }
-      return buffer.toString();
-    } else {
-      if (clean.length > 8) {
-        return '${clean.substring(0, 4)} ${clean.substring(4, 8)} ${clean.substring(8)}';
-      } else if (clean.length > 4) {
-        return '${clean.substring(0, 4)} ${clean.substring(4)}';
-      }
-      return clean;
-    }
+    _isOnline = widget.tukang.isOnline;
   }
 
   void _showEditServicesModal() {
@@ -489,553 +390,6 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showEditPayoutAccountModal() {
-    final currentAccount = _payoutAccounts.isNotEmpty
-        ? _payoutAccounts.first
-        : PayoutAccount(type: 'bank', provider: 'BCA', accountNumber: '2102198765', accountName: widget.tukang.name);
-
-    final providerCtrl = TextEditingController(text: currentAccount.provider);
-    final numberCtrl = TextEditingController(text: currentAccount.accountNumber);
-    final nameCtrl = TextEditingController(text: currentAccount.accountName);
-    String type = currentAccount.type;
-
-    final bankProviders = ['BCA', 'Mandiri', 'BRI', 'BNI'];
-    final ewalletProviders = ['GoPay', 'OVO', 'DANA', 'ShopeePay'];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (modalCtx) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            final activeTab = type == 'bank' ? 0 : 1;
-            final currentProviderList = activeTab == 0 ? bankProviders : ewalletProviders;
-
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.88,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                children: [
-                  // Top Drag Handle
-                  Center(
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 12, bottom: 8),
-                      width: 44,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                  ),
-
-                  // Header
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFECFDF5),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.successGreen, size: 24),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                'Rekening Payout & E-Wallet',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textDark),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Pencairan saldo komisi & hasil kerja otomatis ditransfer ke sini.',
-                                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close, color: AppColors.textMuted),
-                          onPressed: () => Navigator.pop(modalCtx),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const Divider(height: 12),
-
-                  // Scrollable Body
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 1. Virtual Card / E-Wallet Card Live Preview
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(18),
-                            decoration: BoxDecoration(
-                              gradient: _getProviderGradient(providerCtrl.text),
-                              borderRadius: BorderRadius.circular(18),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: _getProviderShadowColor(providerCtrl.text).withValues(alpha: 0.35),
-                                  blurRadius: 14,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Container(
-                                          width: 34,
-                                          height: 24,
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFFDE047),
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: const Color(0xFFCA8A04), width: 1),
-                                          ),
-                                          child: const Center(
-                                            child: Icon(Icons.memory, size: 16, color: Color(0xFF854D0E)),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        const Icon(Icons.contactless_rounded, color: Colors.white70, size: 20),
-                                      ],
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.2),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            providerCtrl.text.toUpperCase(),
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w900,
-                                              fontSize: 12,
-                                              letterSpacing: 0.5,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black.withValues(alpha: 0.25),
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              type == 'bank' ? 'BANK' : 'E-WALLET',
-                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 8),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 22),
-                                Text(
-                                  _formatAccountNumber(numberCtrl.text, type),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 2.2,
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                                const SizedBox(height: 22),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'NAMA PEMILIK REKENING',
-                                          style: TextStyle(color: Colors.white70, fontSize: 9, letterSpacing: 1),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          nameCtrl.text.trim().isEmpty ? 'NAMA LENGKAP MITRA' : nameCtrl.text.trim().toUpperCase(),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.black.withValues(alpha: 0.25),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                                      ),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.verified_rounded, color: Color(0xFF4ADE80), size: 13),
-                                          SizedBox(width: 4),
-                                          Text(
-                                            'TERDAFTAR',
-                                            style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // 2. Tab Segmented Selector: Bank vs E-Wallet
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: AppColors.background,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      setModalState(() {
-                                        type = 'bank';
-                                        if (!bankProviders.contains(providerCtrl.text)) {
-                                          providerCtrl.text = bankProviders.first;
-                                        }
-                                      });
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(vertical: 10),
-                                      decoration: BoxDecoration(
-                                        color: type == 'bank' ? Colors.white : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(10),
-                                        boxShadow: type == 'bank'
-                                            ? [
-                                                BoxShadow(
-                                                  color: Colors.black.withValues(alpha: 0.05),
-                                                  blurRadius: 4,
-                                                  offset: const Offset(0, 2),
-                                                )
-                                              ]
-                                            : null,
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.account_balance_rounded,
-                                            size: 16,
-                                            color: type == 'bank' ? AppColors.primary : AppColors.textMuted,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            'Transfer Bank',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 13,
-                                              color: type == 'bank' ? AppColors.textDark : AppColors.textMuted,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      setModalState(() {
-                                        type = 'ewallet';
-                                        if (!ewalletProviders.contains(providerCtrl.text)) {
-                                          providerCtrl.text = ewalletProviders.first;
-                                        }
-                                      });
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(vertical: 10),
-                                      decoration: BoxDecoration(
-                                        color: type == 'ewallet' ? Colors.white : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(10),
-                                        boxShadow: type == 'ewallet'
-                                            ? [
-                                                BoxShadow(
-                                                  color: Colors.black.withValues(alpha: 0.05),
-                                                  blurRadius: 4,
-                                                  offset: const Offset(0, 2),
-                                                )
-                                              ]
-                                            : null,
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.phone_android_rounded,
-                                            size: 16,
-                                            color: type == 'ewallet' ? AppColors.primary : AppColors.textMuted,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            'Dompet E-Wallet',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 13,
-                                              color: type == 'ewallet' ? AppColors.textDark : AppColors.textMuted,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 14),
-
-                          // 3. Provider Chips Selector
-                          const Text(
-                            'Pilih Bank / Penyedia E-Wallet',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textDark),
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: currentProviderList.map((p) {
-                              final isSelected = providerCtrl.text.toUpperCase() == p.toUpperCase();
-                              return ChoiceChip(
-                                label: Text(p),
-                                selected: isSelected,
-                                onSelected: (sel) {
-                                  if (sel) {
-                                    setModalState(() {
-                                      providerCtrl.text = p;
-                                    });
-                                  }
-                                },
-                                selectedColor: AppColors.primary.withValues(alpha: 0.12),
-                                backgroundColor: Colors.white,
-                                labelStyle: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                  color: isSelected ? AppColors.primary : AppColors.textDark,
-                                ),
-                                side: BorderSide(
-                                  color: isSelected ? AppColors.primary : AppColors.border,
-                                  width: isSelected ? 1.5 : 1,
-                                ),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              );
-                            }).toList(),
-                          ),
-
-                          const SizedBox(height: 18),
-
-                          // 4. Input Fields
-                          Text(
-                            type == 'bank' ? 'Nomor Rekening Bank' : 'Nomor Handphone E-Wallet',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textDark),
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.background,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: TextField(
-                              controller: numberCtrl,
-                              keyboardType: TextInputType.number,
-                              onChanged: (_) => setModalState(() {}),
-                              decoration: InputDecoration(
-                                prefixIcon: Icon(
-                                  type == 'bank' ? Icons.credit_card_rounded : Icons.phone_android_rounded,
-                                  color: AppColors.primary,
-                                  size: 20,
-                                ),
-                                hintText: type == 'bank' ? 'Masukkan nomor rekening (cth: 2102198765)' : 'Masukkan nomor HP (cth: 081234567890)',
-                                hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 14),
-
-                          const Text(
-                            'Nama Pemilik Rekening / Akun',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textDark),
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.background,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: TextField(
-                              controller: nameCtrl,
-                              textCapitalization: TextCapitalization.words,
-                              onChanged: (_) => setModalState(() {}),
-                              decoration: const InputDecoration(
-                                prefixIcon: Icon(Icons.person_outline_rounded, color: AppColors.primary, size: 20),
-                                hintText: 'Nama lengkap sesuai rekening bank / e-wallet',
-                                hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 13),
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 14),
-
-                          // Notice container
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFBFDBFE)),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Icon(Icons.shield_outlined, color: AppColors.primary, size: 18),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Pastikan nama pemilik rekening sama dengan nama akun Anda untuk kelancaran penarikan saldo instan.',
-                                    style: TextStyle(fontSize: 11, color: AppColors.textDark, height: 1.3),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 20),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Bottom Save Action
-                  Container(
-                    padding: EdgeInsets.only(
-                      left: 20,
-                      right: 20,
-                      top: 14,
-                      bottom: MediaQuery.of(modalCtx).padding.bottom + 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border(top: BorderSide(color: Colors.grey.shade200)),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -3)),
-                      ],
-                    ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          if (numberCtrl.text.trim().isEmpty || nameCtrl.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Harap lengkapi nomor rekening dan nama pemilik.'),
-                                backgroundColor: AppColors.dangerRed,
-                              ),
-                            );
-                            return;
-                          }
-
-                          final updatedAcc = PayoutAccount(
-                            type: type,
-                            provider: providerCtrl.text,
-                            accountNumber: numberCtrl.text.trim(),
-                            accountName: nameCtrl.text.trim(),
-                          );
-
-                          setState(() {
-                            _payoutAccounts = [updatedAcc];
-                          });
-                          final updatedTukang = widget.tukang.copyWith(payoutAccounts: [updatedAcc]);
-                          context.read<AuthBloc>().add(TukangProfileUpdatedEvent(updatedTukang));
-
-                          Navigator.pop(modalCtx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  const Icon(Icons.check_circle, color: Colors.white),
-                                  const SizedBox(width: 8),
-                                  Text('Rekening payout ${updatedAcc.provider} berhasil disimpan!'),
-                                ],
-                              ),
-                              backgroundColor: AppColors.successGreen,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.check_circle_rounded, color: Colors.white),
-                        label: const Text(
-                          'Simpan Rekening Payout',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.textDark,
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                      ),
                     ),
                   ),
                 ],
@@ -1823,8 +1177,6 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final currentPayout = _payoutAccounts.isNotEmpty ? _payoutAccounts.first : null;
-
     return Scaffold(
       backgroundColor: AppColors.textDark,
       appBar: AppBar(
@@ -2042,14 +1394,43 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
 
                   // Options List
                   _buildProfileTile(
-                    icon: Icons.account_balance_rounded,
+                    icon: Icons.wifi_tethering_rounded,
+                    iconBg: _isOnline ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                    iconColor: _isOnline ? AppColors.successGreen : AppColors.textMuted,
+                    title: 'Status Penerimaan Pesanan (Radar)',
+                    subtitle: _isOnline ? 'Online • Siap menerima order pekerjaan' : 'Offline • Istirahat / Order nonaktif',
+                    trailing: Switch(
+                      value: _isOnline,
+                      activeThumbColor: AppColors.successGreen,
+                      onChanged: (val) {
+                        setState(() => _isOnline = val);
+                        final updatedTukang = widget.tukang.copyWith(isOnline: val);
+                        context.read<AuthBloc>().add(TukangProfileUpdatedEvent(updatedTukang));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(val ? 'Status Mitra kini ONLINE' : 'Status Mitra kini OFFLINE'),
+                            backgroundColor: val ? AppColors.successGreen : AppColors.textDark,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  _buildProfileTile(
+                    icon: Icons.payments_rounded,
                     iconBg: const Color(0xFFECFDF5),
                     iconColor: AppColors.successGreen,
-                    title: 'Rekening Payout & Pencairan',
-                    subtitle: currentPayout != null
-                        ? '${currentPayout.provider} • ${_formatAccountNumber(currentPayout.accountNumber, currentPayout.type)} (a.n ${currentPayout.accountName})'
-                        : 'Belum diatur • Klik untuk tambah',
-                    onTap: _showEditPayoutAccountModal,
+                    title: 'Metode Pembayaran',
+                    subtitle: 'Tunai di tempat (Pure Cash) langsung dari konsumen',
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Pembayaran dilakukan tunai langsung oleh konsumen di lokasi kerja sesuai nota kesepakatan.'),
+                          backgroundColor: AppColors.textDark,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
                   ),
                   _buildProfileTile(
                     icon: Icons.map_outlined,
@@ -2126,7 +1507,8 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
     required Color iconColor,
     required String title,
     required String subtitle,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
+    Widget? trailing,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -2156,7 +1538,7 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
           ),
           title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textDark)),
           subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-          trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 20),
+          trailing: trailing ?? const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 20),
           onTap: onTap,
         ),
       ),

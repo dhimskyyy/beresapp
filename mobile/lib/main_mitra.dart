@@ -1,6 +1,9 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/constants/app_colors.dart';
+import 'core/widgets/app_state_view.dart';
 import 'data/models/ticket_model.dart';
 import 'data/models/tukang_model.dart';
 import 'data/repositories/auth_repository_impl.dart';
@@ -14,7 +17,6 @@ import 'features/auth/pages/tukang_login_page.dart';
 import 'features/auth/pages/tukang_onboarding_page.dart';
 import 'features/chat/bloc/chat_bloc.dart';
 import 'features/payment/bloc/payment_bloc.dart';
-import 'features/payment/pages/tukang_wallet_page.dart';
 import 'features/ticket/bloc/ticket_bloc.dart';
 import 'features/ticket/bloc/ticket_event.dart';
 import 'features/ticket/bloc/ticket_state.dart';
@@ -117,14 +119,79 @@ class MitraMainRouter extends StatelessWidget {
   }
 }
 
-class MitraVerificationGate extends StatelessWidget {
+class MitraVerificationGate extends StatefulWidget {
   final TukangModel tukang;
 
   const MitraVerificationGate({super.key, required this.tukang});
 
   @override
+  State<MitraVerificationGate> createState() => _MitraVerificationGateState();
+}
+
+class _MitraVerificationGateState extends State<MitraVerificationGate> {
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _tukangSub;
+  bool _isChecking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tukangSub = FirebaseFirestore.instance
+        .collection('tukang')
+        .doc(widget.tukang.id)
+        .snapshots()
+        .listen((snap) {
+      if (snap.exists && snap.data() != null && mounted) {
+        final updated = TukangModel.fromMap(snap.data()!, snap.id);
+        if (updated.verificationStatus == 'verified' && !updated.isCurrentlySuspended) {
+          context.read<AuthBloc>().add(TukangProfileUpdatedEvent(updated));
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _tukangSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _manualCheck() async {
+    setState(() => _isChecking = true);
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('tukang')
+          .doc(widget.tukang.id)
+          .get();
+      if (snap.exists && snap.data() != null && mounted) {
+        final updated = TukangModel.fromMap(snap.data()!, snap.id);
+        context.read<AuthBloc>().add(TukangProfileUpdatedEvent(updated));
+        if (updated.verificationStatus == 'verified') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Selamat! Akun Anda telah diverifikasi oleh Admin.'),
+              backgroundColor: AppColors.successGreen,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Akun masih dalam antrean tinjauan admin.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengecek status: $e'), backgroundColor: AppColors.dangerRed),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isChecking = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isSuspended = tukang.isCurrentlySuspended;
+    final isSuspended = widget.tukang.isCurrentlySuspended;
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -161,9 +228,21 @@ class MitraVerificationGate extends StatelessWidget {
               Text(
                 isSuspended
                     ? 'Akses radar, bidding, dan pekerjaan sementara dinonaktifkan.'
-                    : 'Profil Anda sudah tersimpan. Radar job dan bidding akan aktif setelah KYC disetujui admin.',
+                    : 'Profil Anda sudah tersimpan. Radar job dan bidding akan otomatis terbuka setelah dokumen KYC disetujui admin di Web Admin.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.textMuted, height: 1.4),
+              ),
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                onPressed: _isChecking ? null : _manualCheck,
+                icon: _isChecking
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.refresh_rounded),
+                label: Text(_isChecking ? 'Memeriksa...' : 'Periksa Status Verifikasi Sekarang'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
             ],
           ),
@@ -217,7 +296,6 @@ class _MitraBottomNavWrapperState extends State<MitraBottomNavWrapper> {
             onGoToRadar: () => setState(() => _selectedIndex = 0),
           ),
           MitraChatListPage(tukang: widget.tukang),
-          TukangWalletPage(tukang: widget.tukang),
           TukangProfilePage(tukang: widget.tukang),
         ];
 
@@ -261,11 +339,7 @@ class _MitraBottomNavWrapperState extends State<MitraBottomNavWrapper> {
                   label: 'Chat',
                 ),
                 BottomNavigationBarItem(
-                  icon: _buildNavIcon(Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, 3),
-                  label: 'Dompet',
-                ),
-                BottomNavigationBarItem(
-                  icon: _buildNavIcon(Icons.person_outline_rounded, Icons.person_rounded, 4),
+                  icon: _buildNavIcon(Icons.person_outline_rounded, Icons.person_rounded, 3),
                   label: 'Profil',
                 ),
               ],
@@ -356,64 +430,7 @@ class _MitraWorkManagementPageState extends State<MitraWorkManagementPage> with 
             controller: _tabController,
             children: [
               // Tab 1: Active Job
-              activeTicket != null
-                  ? MitraActiveJobPage(ticket: activeTicket, tukang: widget.tukang)
-                  : Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: AppColors.textDark.withValues(alpha: 0.08),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.engineering_outlined, size: 56, color: AppColors.textDark),
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Belum Ada Pengerjaan Aktif',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: AppColors.textDark),
-                            ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Silakan ajukan penawaran harga pada tab Radar Job untuk mengambil pesanan baru.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-                            ),
-                            const SizedBox(height: 20),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                ElevatedButton.icon(
-                                  onPressed: widget.onGoToRadar,
-                                  icon: const Icon(Icons.radar, size: 18, color: Colors.white),
-                                  label: const Text('Buka Radar Job', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.textDark,
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                OutlinedButton.icon(
-                                  onPressed: () => _tabController.animateTo(1),
-                                  icon: const Icon(Icons.history, size: 18, color: AppColors.textDark),
-                                  label: const Text('Lihat Riwayat', style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold)),
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    side: const BorderSide(color: AppColors.border),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+              _buildActiveTabContent(tState, activeTicket),
 
               // Tab 2: History
               MitraJobHistoryPage(tukang: widget.tukang),
@@ -421,6 +438,78 @@ class _MitraWorkManagementPageState extends State<MitraWorkManagementPage> with 
           ),
         );
       },
+    );
+  }
+
+  Widget _buildActiveTabContent(TicketState tState, TicketModel? activeTicket) {
+    if (tState is TicketLoadingState) {
+      return const AppLoadingView(message: 'Memuat status pengerjaan...');
+    }
+    if (tState is TicketOperationFailureState) {
+      return AppErrorView(
+        title: 'Gagal Memuat Pengerjaan',
+        message: tState.message,
+        onRetry: () => context.read<TicketBloc>().add(FetchTukangActiveTicketsEvent(widget.tukang.id)),
+      );
+    }
+    if (activeTicket != null) {
+      return MitraActiveJobPage(ticket: activeTicket, tukang: widget.tukang);
+    }
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.textDark.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.engineering_outlined, size: 56, color: AppColors.textDark),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Belum Ada Pengerjaan Aktif',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: AppColors.textDark),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Silakan ajukan penawaran harga pada tab Radar Job untuk mengambil pesanan baru.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: widget.onGoToRadar,
+                  icon: const Icon(Icons.radar, size: 18, color: Colors.white),
+                  label: const Text('Buka Radar Job', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.textDark,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () => _tabController.animateTo(1),
+                  icon: const Icon(Icons.history, size: 18, color: AppColors.textDark),
+                  label: const Text('Lihat Riwayat', style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    side: const BorderSide(color: AppColors.border),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

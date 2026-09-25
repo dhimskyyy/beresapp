@@ -29,13 +29,13 @@ class _UserHelpCenterPageState extends State<UserHelpCenterPage> {
     {
       'question': 'Apakah pembayaran di BeresApp aman?',
       'answer':
-          'Sangat aman. Dana yang Anda bayarkan melalui Saldomu, QRIS, atau Virtual Account akan ditahan oleh sistem BeresApp (rekening bersama) dan baru diteruskan ke tukang setelah Anda mengonfirmasi pekerjaan selesai dengan baik.',
+          'Sangat transparan dan aman. Pembayaran dilakukan secara tunai (Pure Cash) langsung kepada mitra teknisi di tempat setelah pekerjaan selesai dan Anda telah memeriksa hasilnya sesuai rincian nota yang disetujui bersama.',
       'category': 'Pembayaran',
     },
     {
       'question': 'Bagaimana jika saya ingin membatalkan pesanan?',
       'answer':
-          'Anda dapat membatalkan pesanan selama tukang belum memulai pengerjaan fisik atau belum ada persetujuan invoice final. Dana yang telah didepositkan akan dikembalikan secara penuh ke Saldomu.',
+          'Anda dapat membatalkan pesanan selama mitra belum memulai pengerjaan fisik. Karena pembayaran dilakukan tunai di lokasi setelah pekerjaan selesai, tidak ada pemotongan biaya di muka.',
       'category': 'Pembatalan',
     },
     {

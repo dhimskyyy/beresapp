@@ -6,6 +6,8 @@ class ChatMessageModel {
   final String? imageUrl;
   final bool isRead;
   final DateTime timestamp;
+  final String deliveryStatus; // 'sending', 'sent', 'failed'
+  final String? localError;
 
   ChatMessageModel({
     required this.id,
@@ -15,6 +17,8 @@ class ChatMessageModel {
     this.imageUrl,
     this.isRead = false,
     required this.timestamp,
+    this.deliveryStatus = 'sent',
+    this.localError,
   });
 
   factory ChatMessageModel.fromMap(Map<String, dynamic> map, String id) {
@@ -39,6 +43,8 @@ class ChatMessageModel {
       imageUrl: map['imageUrl'],
       isRead: map['isRead'] ?? false,
       timestamp: parsedTime,
+      deliveryStatus: map['deliveryStatus'] ?? 'sent',
+      localError: map['localError'],
     );
   }
 
@@ -51,6 +57,32 @@ class ChatMessageModel {
       'imageUrl': imageUrl,
       'isRead': isRead,
       'timestamp': timestamp.toIso8601String(),
+      'deliveryStatus': deliveryStatus,
     };
+  }
+
+  ChatMessageModel copyWith({
+    String? id,
+    String? senderId,
+    String? senderRole,
+    String? text,
+    String? imageUrl,
+    bool? isRead,
+    DateTime? timestamp,
+    String? deliveryStatus,
+    String? localError,
+    bool clearLocalError = false,
+  }) {
+    return ChatMessageModel(
+      id: id ?? this.id,
+      senderId: senderId ?? this.senderId,
+      senderRole: senderRole ?? this.senderRole,
+      text: text ?? this.text,
+      imageUrl: imageUrl ?? this.imageUrl,
+      isRead: isRead ?? this.isRead,
+      timestamp: timestamp ?? this.timestamp,
+      deliveryStatus: deliveryStatus ?? this.deliveryStatus,
+      localError: clearLocalError ? null : (localError ?? this.localError),
+    );
   }
 }

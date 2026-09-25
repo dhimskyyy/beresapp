@@ -22,4 +22,5 @@ abstract class AuthRepository {
   
   Future<void> signOut();
   Future<dynamic> getCurrentUser(); // Returns UserModel or TukangModel
+  Future<TukangModel> updateTukangProfile(TukangModel tukang);
 }

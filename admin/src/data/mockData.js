@@ -1,5 +1,5 @@
 // Realistic mock data for Beres Ecosystem
-// Strictly tailored to Indonesian context, 10 categories, DOKU & payout channels
+// Strictly tailored to Indonesian context, 10 categories, Pure Cash payment model
 
 export const initialTukangList = [
   {
@@ -11,10 +11,7 @@ export const initialTukangList = [
     birthDate: "1988-06-14",
     age: 38,
     services: ["ac", "elektronik", "plumbing"],
-    payoutAccounts: [
-      { type: "bank", provider: "BCA", accountNumber: "2102198765", accountName: "Ahmad Subarjo" },
-      { type: "ewallet", provider: "DANA", accountNumber: "081388912341", accountName: "Ahmad Subarjo" }
-    ],
+    payoutAccounts: [],
     ktpUrl: "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop&q=80",
     ktpNik: "3276011406880002",
     verificationStatus: "verified", // pending_verification | verified | rejected
@@ -22,7 +19,7 @@ export const initialTukangList = [
     isSuspended: false,
     suspendedUntil: null,
     suspendReason: null,
-    walletBalance: 875000,
+    walletBalance: 0,
     rating: 4.9,
     reviewCount: 42,
     totalJobsDone: 56,
@@ -46,9 +43,7 @@ export const initialTukangList = [
     birthDate: "1984-11-20",
     age: 41,
     services: ["las", "besi_baja", "bangunan"],
-    payoutAccounts: [
-      { type: "bank", provider: "MANDIRI", accountNumber: "1570008892112", accountName: "Bambang Pamungkas" }
-    ],
+    payoutAccounts: [],
     ktpUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80",
     ktpNik: "3171052011840003",
     verificationStatus: "pending_verification",
@@ -81,10 +76,7 @@ export const initialTukangList = [
     birthDate: "1993-02-18",
     age: 33,
     services: ["cleaning", "pengrajin_kayu"],
-    payoutAccounts: [
-      { type: "bank", provider: "BRI", accountNumber: "034101000998501", accountName: "Hendra Wijaya" },
-      { type: "ewallet", provider: "GOPAY", accountNumber: "085711223344", accountName: "Hendra Wijaya" }
-    ],
+    payoutAccounts: [],
     ktpUrl: "https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&auto=format&fit=crop&q=80",
     ktpNik: "3275021802930007",
     verificationStatus: "verified",
@@ -92,7 +84,7 @@ export const initialTukangList = [
     isSuspended: true,
     suspendedUntil: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000 + 14 * 60 * 60 * 1000).toISOString(),
     suspendReason: "Membatalkan pesanan secara sepihak dan meminta tarif di luar tagihan aplikasi",
-    walletBalance: 320000,
+    walletBalance: 0,
     rating: 3.6,
     reviewCount: 15,
     totalJobsDone: 18,
@@ -115,10 +107,7 @@ export const initialTukangList = [
     birthDate: "1995-09-09",
     age: 30,
     services: ["bengkel_motor", "bengkel_mobil"],
-    payoutAccounts: [
-      { type: "bank", provider: "BNI", accountNumber: "0891234567", accountName: "Rizki Pratama" },
-      { type: "ewallet", provider: "OVO", accountNumber: "087899881234", accountName: "Rizki Pratama" }
-    ],
+    payoutAccounts: [],
     ktpUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800&auto=format&fit=crop&q=80",
     ktpNik: "3174090909950005",
     verificationStatus: "verified",
@@ -126,7 +115,7 @@ export const initialTukangList = [
     isSuspended: false,
     suspendedUntil: null,
     suspendReason: null,
-    walletBalance: 1250000,
+    walletBalance: 0,
     rating: 4.8,
     reviewCount: 31,
     totalJobsDone: 39,
@@ -149,9 +138,7 @@ export const initialTukangList = [
     birthDate: "1986-04-03",
     age: 40,
     services: ["plumbing", "bangunan"],
-    payoutAccounts: [
-      { type: "bank", provider: "BCA", accountNumber: "5220918273", accountName: "Dedi Suryadi" }
-    ],
+    payoutAccounts: [],
     ktpUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80",
     ktpNik: "3271010304860001",
     verificationStatus: "pending_verification",
@@ -267,7 +254,7 @@ export const initialTicketsList = [
       "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&auto=format&fit=crop&q=80"
     ],
     afterPhotos: [],
-    paymentMethod: "doku",
+    paymentMethod: "CASH",
     paymentStatus: "unpaid",
     createdAt: "2026-09-18 07:30 WIB"
   },
@@ -336,43 +323,12 @@ export const initialTicketsList = [
     afterPhotos: [
       "https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=600&auto=format&fit=crop&q=80"
     ],
-    paymentMethod: "doku",
+    paymentMethod: "CASH",
     paymentStatus: "paid",
     rating: {
       stars: 5,
       review: "Pak Bambang kerjanya rapi sekali dan las sangat kokoh. Sangat puas!"
     },
     createdAt: "2026-09-17 14:00 WIB"
-  }
-];
-
-export const initialWithdrawalsList = [
-  {
-    id: "WD-901",
-    tukangId: "TKG-001",
-    tukangName: "Ahmad Subarjo",
-    amount: 500000,
-    payoutTarget: {
-      provider: "BCA",
-      accountNumber: "2102198765",
-      accountName: "Ahmad Subarjo"
-    },
-    status: "pending", // pending | approved | rejected
-    requestedAt: "2026-09-18 06:45 WIB"
-  },
-  {
-    id: "WD-899",
-    tukangId: "TKG-004",
-    tukangName: "Rizki Pratama",
-    amount: 750000,
-    payoutTarget: {
-      provider: "BNI",
-      accountNumber: "0891234567",
-      accountName: "Rizki Pratama"
-    },
-    status: "approved",
-    requestedAt: "2026-09-17 10:20 WIB",
-    processedAt: "2026-09-17 11:05 WIB",
-    adminNote: "Transfer sukses via Virtual Payout BNI Ref #TRX88291"
   }
 ];

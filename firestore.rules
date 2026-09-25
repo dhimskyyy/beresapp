@@ -27,14 +27,14 @@ service cloud.firestore {
     }
 
     match /tukang/{tukangId} {
-      allow read: if signedIn() && (request.auth.uid == tukangId || isAdmin());
+      // User dapat membaca profil tukang untuk melihat reputasi & data bidding
+      allow read: if signedIn();
       allow create: if signedIn() && request.auth.uid == tukangId
         && request.resource.data.verificationStatus == 'pending_verification'
         && request.resource.data.isSuspended == false;
       allow update: if isAdmin() || (signedIn() && request.auth.uid == tukangId
         && request.resource.data.verificationStatus == resource.data.verificationStatus
         && request.resource.data.isSuspended == resource.data.isSuspended
-        && request.resource.data.walletBalance == resource.data.walletBalance
         && request.resource.data.id == resource.data.id);
       allow delete: if isAdmin();
     }
@@ -54,31 +54,30 @@ service cloud.firestore {
         || (resource.data.userId == request.auth.uid
           && request.resource.data.userId == resource.data.userId
           && request.resource.data.createdAt == resource.data.createdAt
-          && request.resource.data.paymentStatus == resource.data.paymentStatus
           && (
             (request.resource.data.status == resource.data.status)
             || (resource.data.status in ['OPEN', 'BIDDING'] && request.resource.data.status == 'LOCKED' && request.resource.data.selectedTukangId != null)
             || (resource.data.status in ['OPEN', 'BIDDING', 'LOCKED'] && request.resource.data.status == 'CANCELED')
+            || (resource.data.status == 'PAYMENT_PENDING' && request.resource.data.status == 'COMPLETED' && request.resource.data.paymentMethod == 'CASH' && request.resource.data.paymentStatus == 'paid')
           ))
         || (resource.data.selectedTukangId == request.auth.uid
           && isTukangVerified()
           && request.resource.data.userId == resource.data.userId
           && request.resource.data.selectedTukangId == resource.data.selectedTukangId
           && request.resource.data.createdAt == resource.data.createdAt
-          && request.resource.data.paymentStatus == resource.data.paymentStatus
           && (
             (resource.data.status == 'LOCKED' && request.resource.data.status == 'ON_THE_WAY')
             || (resource.data.status == 'ON_THE_WAY' && request.resource.data.status == 'ARRIVED')
             || (resource.data.status == 'ARRIVED' && request.resource.data.status == 'IN_PROGRESS')
             || (resource.data.status == 'IN_PROGRESS' && request.resource.data.status == 'WORK_COMPLETED')
             || (resource.data.status == 'WORK_COMPLETED' && request.resource.data.status == 'PAYMENT_PENDING')
+            || (resource.data.status == 'PAYMENT_PENDING' && request.resource.data.status == 'COMPLETED' && request.resource.data.paymentMethod == 'CASH' && request.resource.data.paymentStatus == 'paid')
             || (request.resource.data.status == resource.data.status)
           ))
         || (resource.data.status in ['OPEN', 'BIDDING']
           && isTukangVerified()
           && request.resource.data.userId == resource.data.userId
           && request.resource.data.createdAt == resource.data.createdAt
-          && request.resource.data.paymentStatus == resource.data.paymentStatus
           && request.resource.data.status == 'BIDDING')
       );
       allow delete: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid && resource.data.status in ['OPEN', 'BIDDING', 'CANCELED']);
@@ -99,23 +98,11 @@ service cloud.firestore {
     }
 
     match /withdrawals/{withdrawalId} {
-      allow read: if signedIn() && (
-        isAdmin() || resource.data.tukangId == request.auth.uid
-      );
-      allow create: if signedIn() && request.resource.data.tukangId == request.auth.uid
-        && isTukangVerified()
-        && request.resource.data.status == 'pending';
-      allow update, delete: if isAdmin();
+      allow read, write: if isAdmin();
     }
 
     match /walletTransactions/{transactionId} {
-      allow read: if signedIn() && (
-        isAdmin() || resource.data.tukangId == request.auth.uid || resource.data.userId == request.auth.uid
-      );
-      allow create: if signedIn() && (
-        isAdmin() || request.resource.data.tukangId == request.auth.uid
-      );
-      allow update, delete: if isAdmin();
+      allow read, write: if isAdmin();
     }
   }
 }

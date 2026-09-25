@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -36,6 +38,7 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
   List<BillItem> _billItems = [];
 
   final _currencyFormat = NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0);
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _ticketSub;
 
   @override
   void initState() {
@@ -44,10 +47,25 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
     if (_currentTicket.finalBill != null) {
       _billItems = List.from(_currentTicket.finalBill!.items);
     }
+    _ticketSub = FirebaseFirestore.instance
+        .collection('tickets')
+        .doc(widget.ticket.id)
+        .snapshots()
+        .listen((snap) {
+      if (snap.exists && snap.data() != null && mounted) {
+        setState(() {
+          _currentTicket = TicketModel.fromMap(snap.data()!, snap.id);
+          if (_currentTicket.finalBill != null) {
+            _billItems = List.from(_currentTicket.finalBill!.items);
+          }
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    _ticketSub?.cancel();
     _itemTitleController.dispose();
     _itemAmountController.dispose();
     super.dispose();
@@ -877,7 +895,7 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Total invoice: ${_currencyFormat.format(totalBill)}. Dana pembayaran konsumen tertampung aman di Beres Escrow dan akan otomatis diteruskan ke Dompet BeresPay Anda setelah konsumen menyetujui.',
+                          'Total nota tagihan: ${_currencyFormat.format(totalBill)}. Pembayaran dilakukan secara tunai (Pure Cash) langsung oleh konsumen di lokasi pengerjaan.',
                           style: const TextStyle(fontSize: 12, color: AppColors.textDark, height: 1.4),
                         ),
                       ],
@@ -1476,6 +1494,96 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
       );
     }
 
+    if (status == TicketStatus.paymentPending) {
+      final total = t.finalBill?.totalAmount ?? 0;
+      return Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFECFDF5),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.successGreen.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.payments_rounded, color: AppColors.successGreen, size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Pembayaran Tunai di Tempat',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textDark),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Nota disetujui konsumen. Silakan terima uang tunai sejumlah ${_currencyFormat.format(total)} dari konsumen.',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => _showConfirmCashPaymentDialog(context, t),
+            icon: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
+            label: Text(
+              '💵 Konfirmasi Uang Tunai Diterima (${_currencyFormat.format(total)})',
+              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.successGreen,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 2,
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (status == TicketStatus.completed) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFECFDF5),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.successGreen.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          children: [
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.verified_rounded, color: AppColors.successGreen, size: 22),
+                SizedBox(width: 8),
+                Text(
+                  'Pekerjaan Selesai & Lunas Tunai',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.successGreen),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textDark),
+              label: const Text('Kembali ke Radar Pekerjaan', style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.textDark, width: 1.5),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return OutlinedButton.icon(
       onPressed: () => Navigator.pop(context),
       icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textDark),
@@ -1484,6 +1592,77 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
         side: const BorderSide(color: AppColors.textDark, width: 1.5),
         padding: const EdgeInsets.symmetric(vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  void _showConfirmCashPaymentDialog(BuildContext context, TicketModel t) {
+    final total = t.finalBill?.totalAmount ?? 0;
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.payments_rounded, color: AppColors.successGreen),
+            SizedBox(width: 10),
+            Text('Konfirmasi Tunai', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Apakah Anda sudah menerima uang tunai langsung dari konsumen sebesar:'),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                _currencyFormat.format(total),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textDark),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Pastikan uang tunai sudah Anda terima di tempat sebelum menyelesaikan pesanan ini.',
+              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Batal', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogCtx);
+              context.read<TicketBloc>().add(
+                UpdateTicketStatusRequestedEvent(
+                  ticketId: t.id,
+                  newStatus: TicketStatus.completed,
+                ),
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Pembayaran tunai berhasil dikonfirmasi! Tiket selesai.'),
+                  backgroundColor: AppColors.successGreen,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.successGreen,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Ya, Uang Diterima', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }

@@ -21,6 +21,13 @@ class ChatMessagesReceivedEvent extends ChatEvent {
   List<Object?> get props => [messages];
 }
 
+class ChatStreamErrorEvent extends ChatEvent {
+  final String errorMessage;
+  const ChatStreamErrorEvent(this.errorMessage);
+  @override
+  List<Object?> get props => [errorMessage];
+}
+
 class SendChatMessageRequestedEvent extends ChatEvent {
   final String ticketId;
   final String senderId;
@@ -38,4 +45,17 @@ class SendChatMessageRequestedEvent extends ChatEvent {
 
   @override
   List<Object?> get props => [ticketId, senderId, senderRole, text, imagePath];
+}
+
+class RetrySendMessageEvent extends ChatEvent {
+  final String ticketId;
+  final ChatMessageModel failedMessage;
+
+  const RetrySendMessageEvent({
+    required this.ticketId,
+    required this.failedMessage,
+  });
+
+  @override
+  List<Object?> get props => [ticketId, failedMessage];
 }

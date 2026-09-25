@@ -1,9 +1,13 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/constants/app_colors.dart';
 import 'core/constants/service_categories.dart';
+import 'core/widgets/app_state_view.dart';
+import 'core/widgets/gps_requirement_dialog.dart';
 import 'data/models/ticket_model.dart';
 import 'data/models/user_model.dart';
 import 'data/repositories/auth_repository_impl.dart';
@@ -129,12 +133,31 @@ class UserBottomNavWrapper extends StatefulWidget {
 class _UserBottomNavWrapperState extends State<UserBottomNavWrapper> {
   int _selectedIndex = 0;
   late UserModel _currentUser;
+  StreamSubscription? _userTicketsSub;
 
   @override
   void initState() {
     super.initState();
     _currentUser = widget.user;
     context.read<TicketBloc>().add(FetchUserTicketsEvent(_currentUser.id));
+    _userTicketsSub = FirebaseFirestore.instance
+        .collection('tickets')
+        .where('userId', isEqualTo: _currentUser.id)
+        .snapshots()
+        .listen((_) {
+      if (mounted) {
+        context.read<TicketBloc>().add(FetchUserTicketsEvent(_currentUser.id));
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      GpsRequirementDialog.checkAndShow(context, isTukang: false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _userTicketsSub?.cancel();
+    super.dispose();
   }
 
   @override
@@ -482,6 +505,17 @@ class UserHomePage extends StatelessWidget {
 
               BlocBuilder<TicketBloc, TicketState>(
                 builder: (context, ticketState) {
+                  if (ticketState is TicketLoadingState) {
+                    return const AppLoadingView(message: 'Memuat tiket aktif...');
+                  }
+
+                  if (ticketState is TicketOperationFailureState) {
+                    return AppErrorView(
+                      message: ticketState.message,
+                      onRetry: () => context.read<TicketBloc>().add(FetchUserTicketsEvent(user.id)),
+                    );
+                  }
+
                   if (ticketState is TicketListLoadedState) {
                     final tickets = ticketState.tickets;
                     if (tickets.isEmpty) {
@@ -579,7 +613,10 @@ class UserHomePage extends StatelessWidget {
                     );
                   }
 
-                  return const Center(child: CircularProgressIndicator());
+                  return AppErrorView(
+                    message: 'Gagal memuat status tiket pekerjaan.',
+                    onRetry: () => context.read<TicketBloc>().add(FetchUserTicketsEvent(user.id)),
+                  );
                 },
               ),
             ],
@@ -825,7 +862,14 @@ class _UserTicketsPageState extends State<UserTicketsPage> {
       body: BlocBuilder<TicketBloc, TicketState>(
         builder: (context, state) {
           if (state is TicketLoadingState) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+            return const AppLoadingView(message: 'Memuat riwayat pesanan...');
+          }
+
+          if (state is TicketOperationFailureState) {
+            return AppErrorView(
+              message: state.message,
+              onRetry: () => context.read<TicketBloc>().add(FetchUserTicketsEvent(widget.user.id)),
+            );
           }
 
           if (state is TicketListLoadedState) {
@@ -899,7 +943,10 @@ class _UserTicketsPageState extends State<UserTicketsPage> {
             );
           }
 
-          return const Center(child: CircularProgressIndicator());
+          return AppErrorView(
+            message: 'Terjadi kesalahan saat memuat tiket pesanan.',
+            onRetry: () => context.read<TicketBloc>().add(FetchUserTicketsEvent(widget.user.id)),
+          );
         },
       ),
     );
@@ -1396,36 +1443,27 @@ class _UserChatListPageState extends State<UserChatListPage> {
       ),
       body: BlocBuilder<TicketBloc, TicketState>(
         builder: (context, state) {
-          if (state is! TicketListLoadedState || state.tickets.isEmpty) {
-            return Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.chat_bubble_outline_rounded, size: 56, color: AppColors.primary),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text('Belum Ada Percakapan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textDark)),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Ruang chat akan otomatis terbuka ketika pesanan Anda diambil oleh teknisi mitra.',
-                      style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
+          if (state is TicketLoadingState) {
+            return const AppLoadingView(message: 'Memuat percakapan...');
+          }
+
+          if (state is TicketOperationFailureState) {
+            return AppErrorView(
+              message: state.message,
+              onRetry: () => context.read<TicketBloc>().add(FetchUserTicketsEvent(widget.user.id)),
             );
           }
 
-          var tickets = state.tickets;
+          if (state is TicketListLoadedState) {
+            if (state.tickets.isEmpty) {
+              return const AppEmptyView(
+                icon: Icons.chat_bubble_outline_rounded,
+                title: 'Belum Ada Percakapan',
+                subtitle: 'Ruang chat akan otomatis terbuka ketika pesanan Anda diambil oleh teknisi mitra.',
+              );
+            }
+
+            var tickets = state.tickets;
           if (_searchQuery.isNotEmpty) {
             tickets = tickets.where((t) {
               final name = t.selectedTukangName ?? '';
@@ -1594,8 +1632,14 @@ class _UserChatListPageState extends State<UserChatListPage> {
               ),
             ],
           );
-        },
-      ),
-    );
-  }
+        }
+
+        return AppErrorView(
+          message: 'Terjadi kesalahan saat memuat obrolan.',
+          onRetry: () => context.read<TicketBloc>().add(FetchUserTicketsEvent(widget.user.id)),
+        );
+      },
+    ),
+  );
+}
 }

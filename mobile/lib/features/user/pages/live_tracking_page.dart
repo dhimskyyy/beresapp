@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -24,6 +26,31 @@ class LiveTrackingPage extends StatefulWidget {
 
 class _LiveTrackingPageState extends State<LiveTrackingPage> {
   final _currencyFormat = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _ticketSub;
+  late TicketModel _liveTicket;
+
+  @override
+  void initState() {
+    super.initState();
+    _liveTicket = widget.ticket;
+    _ticketSub = FirebaseFirestore.instance
+        .collection('tickets')
+        .doc(widget.ticket.id)
+        .snapshots()
+        .listen((snap) {
+      if (snap.exists && snap.data() != null && mounted) {
+        setState(() {
+          _liveTicket = TicketModel.fromMap(snap.data()!, snap.id);
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticketSub?.cancel();
+    super.dispose();
+  }
 
   int _getStepIndex(TicketStatus status) {
     switch (status) {
@@ -291,8 +318,8 @@ class _LiveTrackingPageState extends State<LiveTrackingPage> {
       },
       builder: (context, state) {
         final currentTicket = (state is TicketListLoadedState)
-            ? state.tickets.firstWhere((t) => t.id == widget.ticket.id, orElse: () => widget.ticket)
-            : widget.ticket;
+            ? state.tickets.firstWhere((t) => t.id == widget.ticket.id, orElse: () => _liveTicket)
+            : _liveTicket;
 
         final userLocation = LatLng(currentTicket.lat, currentTicket.lng);
         final tukangLocation = LatLng(currentTicket.lat - 0.0035, currentTicket.lng - 0.0028);
@@ -777,10 +804,13 @@ class _LiveTrackingPageState extends State<LiveTrackingPage> {
                                     builder: (_) => UserPaymentModal(ticket: currentTicket),
                                   );
                                 },
-                                icon: const Icon(Icons.payment, color: Colors.white),
-                                label: const Text('Bayar Tagihan Sekarang (DOKU)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                icon: const Icon(Icons.payments_rounded, color: Colors.white),
+                                label: Text(
+                                  'Bayar Tunai ke Mitra (Rp ${currentTicket.finalBill!.totalAmount.toStringAsFixed(0)})',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                ),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
+                                  backgroundColor: AppColors.successGreen,
                                   minimumSize: const Size.fromHeight(48),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 ),

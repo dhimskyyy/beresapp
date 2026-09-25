@@ -13,7 +13,6 @@ import 'user_favorite_tradesmen_page.dart';
 import 'user_help_center_page.dart';
 import 'user_settings_page.dart';
 import 'user_terms_privacy_page.dart';
-import 'user_wallet_page.dart';
 
 class UserProfilePage extends StatefulWidget {
   final UserModel user;
@@ -32,7 +31,6 @@ class UserProfilePage extends StatefulWidget {
 }
 
 class _UserProfilePageState extends State<UserProfilePage> {
-  double _walletBalance = 350000;
   bool _pushNotification = true;
   bool _whatsappNotification = true;
   String _activeAddressId = '1';
@@ -89,15 +87,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
         _userPhotoUrl = widget.user.photoUrl;
       });
     }
-  }
-
-  String _formatCurrency(double amount) {
-    return amount
-        .toStringAsFixed(0)
-        .replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]}.',
-        );
   }
 
   void _navigateToSettings() {
@@ -168,22 +157,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
             setState(() {
               _savedAddresses = updatedAddresses;
               _activeAddressId = newActiveId;
-            });
-          },
-        ),
-      ),
-    );
-  }
-
-  void _navigateToWallet() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => UserWalletPage(
-          currentBalance: _walletBalance,
-          onBalanceUpdated: (newBalance) {
-            setState(() {
-              _walletBalance = newBalance;
             });
           },
         ),
@@ -592,13 +565,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           onTap: _navigateToAddressList,
                         ),
                         _buildProfileTile(
-                          icon: Icons.account_balance_wallet_outlined,
+                          icon: Icons.payments_outlined,
                           iconBg: const Color(0xFFECFDF5),
                           iconColor: AppColors.successGreen,
-                          title: 'Metode Pembayaran & Saldo',
-                          subtitle:
-                              'Saldomu: Rp ${_formatCurrency(_walletBalance)} • QRIS & VA',
-                          onTap: _navigateToWallet,
+                          title: 'Metode Pembayaran',
+                          subtitle: 'Tunai di tempat (Pure Cash) langsung ke mitra',
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Pembayaran dilakukan langsung dengan uang tunai kepada mitra teknisi di lokasi kerja setelah pekerjaan selesai.'),
+                                backgroundColor: AppColors.textDark,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),

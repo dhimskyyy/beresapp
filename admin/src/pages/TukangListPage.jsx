@@ -10,8 +10,7 @@ import {
   Star, 
   MoreVertical,
   RotateCcw,
-  SlidersHorizontal,
-  Wallet
+  SlidersHorizontal
 } from 'lucide-react';
 import { useAdminData } from '../context/AdminDataContext';
 
@@ -68,7 +67,7 @@ export default function TukangListPage() {
             </span>
           </div>
           <p className="text-sm text-slate-500 mt-1">
-            Kelola data mitra tukang, pantau rating, saldo dompet, serta penegakan disiplin dan sanksi suspend.
+            Kelola data mitra tukang, pantau rating, status keaktifan, serta penegakan disiplin dan sanksi suspend.
           </p>
         </div>
       </div>
@@ -118,7 +117,7 @@ export default function TukangListPage() {
                 <th className="py-3.5 px-5">Profil Mitra</th>
                 <th className="py-3.5 px-4">Keahlian</th>
                 <th className="py-3.5 px-4">Rating & Order</th>
-                <th className="py-3.5 px-4">Saldo Dompet</th>
+                <th className="py-3.5 px-4">Metode Bayar</th>
                 <th className="py-3.5 px-4">Status Akun</th>
                 <th className="py-3.5 px-5 text-right">Disiplin & Sanksi</th>
               </tr>
@@ -166,10 +165,10 @@ export default function TukangListPage() {
                   </td>
 
                   <td className="py-4 px-4">
-                    <p className="font-bold text-slate-900 font-mono">
-                      Rp {t.walletBalance.toLocaleString('id-ID')}
-                    </p>
-                    <p className="text-[10px] text-slate-400">Siap ditarik</p>
+                    <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-semibold text-[11px] border border-emerald-100">
+                      Tunai di Tempat (Cash)
+                    </span>
+                    <p className="text-[10px] text-slate-400 mt-1">Langsung dari konsumen</p>
                   </td>
 
                   <td className="py-4 px-4">

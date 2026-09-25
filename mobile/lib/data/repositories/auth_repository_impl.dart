@@ -134,4 +134,13 @@ class AuthRepositoryImpl implements AuthRepository {
 
     throw Exception('Profil akun tidak ditemukan');
   }
+
+  @override
+  Future<TukangModel> updateTukangProfile(TukangModel tukang) async {
+    await _firestore.collection('tukang').doc(tukang.id).set(
+      tukang.toMap(),
+      SetOptions(merge: true),
+    );
+    return tukang;
+  }
 }

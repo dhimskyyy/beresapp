@@ -66,7 +66,7 @@ export default function KycApprovalPage() {
             </span>
           </div>
           <p className="text-sm text-slate-500 mt-1">
-            Verifikasi spesialisasi keahlian, nomor WhatsApp, dan nomor rekening payout sebelum mitra diizinkan menerima pesanan.
+            Verifikasi spesialisasi keahlian, nomor WhatsApp, dan data diri calon mitra sebelum diizinkan menerima pesanan.
           </p>
         </div>
       </div>
@@ -153,7 +153,7 @@ export default function KycApprovalPage() {
                   <th className="py-3.5 px-5">Calon Mitra</th>
                   <th className="py-3.5 px-4">Kontak WhatsApp</th>
                   <th className="py-3.5 px-4">Keahlian Layanan</th>
-                  <th className="py-3.5 px-4">Rekening Payout</th>
+                  <th className="py-3.5 px-4">Metode Bayar</th>
                   <th className="py-3.5 px-4">Pengalaman / Bio</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-5 text-right">Aksi</th>
@@ -200,17 +200,9 @@ export default function KycApprovalPage() {
                     </td>
 
                     <td className="py-4 px-4">
-                      <div className="space-y-1">
-                        {t.payoutAccounts?.map((acc, idx) => (
-                          <div key={idx} className="text-[11px] text-slate-700 flex items-center gap-1.5">
-                            <span className="font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-800 text-[10px]">
-                              {acc.provider}
-                            </span>
-                            <span className="font-mono text-[11px]">{acc.accountNumber}</span>
-                            <span className="text-slate-400 text-[10px]">({acc.accountName})</span>
-                          </div>
-                        ))}
-                      </div>
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-semibold text-[10px] border border-emerald-100">
+                        Tunai di Tempat (Cash)
+                      </span>
                     </td>
 
                     <td className="py-4 px-4 max-w-[200px]">
@@ -268,7 +260,7 @@ export default function KycApprovalPage() {
             <div className="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">Verifikasi Kelayakan Calon Mitra</h3>
-                <p className="text-xs text-slate-500">Periksa keabsahan kontak, spesialisasi, dan nomor rekening pencairan</p>
+                <p className="text-xs text-slate-500">Periksa keabsahan kontak, spesialisasi, dan kesiapan operasional calon mitra</p>
               </div>
               <button
                 onClick={() => {
@@ -342,15 +334,15 @@ export default function KycApprovalPage() {
                   <ul className="list-disc list-inside text-[11px] text-emerald-800 space-y-1">
                     <li>Nomor WhatsApp aktif dan dapat dihubungi pelanggan.</li>
                     <li>Kategori layanan sesuai dengan kemampuan nyata mitra.</li>
-                    <li>Nama rekening tujuan pencairan cocok dengan nama calon mitra.</li>
+                    <li>Metode transaksi dilakukan langsung secara tunai (Pure Cash) di lokasi konsumen.</li>
                   </ul>
                 </div>
               </div>
 
-              {/* Sisi Kanan: Payout Accounts & Layanan */}
+              {/* Sisi Kanan: Metode Transaksi & Layanan */}
               <div className="space-y-4">
                 <span className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
-                  Kategori Layanan & Akun Pencairan Dana
+                  Kategori Layanan & Metode Pembayaran
                 </span>
 
                 {/* Services Pills */}
@@ -367,25 +359,19 @@ export default function KycApprovalPage() {
                   </div>
                 </div>
 
-                {/* Payout Accounts */}
+                {/* Metode Pembayaran */}
                 <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-2">
                   <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
-                    Akun Rekening Payout Terdaftar:
+                    Metode Pembayaran Transaksi:
                   </span>
-                  <div className="space-y-2">
-                    {selectedTukang.payoutAccounts?.map((acc, i) => (
-                      <div key={i} className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                            {acc.provider}
-                          </span>
-                          <span className="text-xs font-mono font-bold text-slate-900">{acc.accountNumber}</span>
-                        </div>
-                        <p className="text-xs text-slate-500">
-                          Nama Pemilik: <strong className="text-slate-800">{acc.accountName}</strong>
-                        </p>
-                      </div>
-                    ))}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                    <p className="text-xs text-slate-800 font-semibold flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      Tunai Langsung di Tempat (Pure Cash)
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Mitra menerima uang tunai langsung dari konsumen setelah pekerjaan selesai diverifikasi. Tidak ada pemotongan komisi/saldo.
+                    </p>
                   </div>
                 </div>
 
@@ -397,7 +383,7 @@ export default function KycApprovalPage() {
                     </label>
                     <textarea
                       rows={2}
-                      placeholder="Contoh: Nomor telepon tidak dapat dihubungi atau data rekening bank tidak valid."
+                      placeholder="Contoh: Nomor telepon tidak aktif atau foto dokumen KTP kurang jelas."
                       value={rejectReason}
                       onChange={(e) => setRejectReason(e.target.value)}
                       className="w-full p-2.5 text-xs rounded-lg border border-rose-300 bg-white focus:outline-none focus:ring-2 focus:ring-rose-500 text-slate-900"

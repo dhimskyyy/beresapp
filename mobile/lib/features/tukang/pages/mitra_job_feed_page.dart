@@ -1,17 +1,22 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/service_categories.dart';
+import '../../../core/widgets/app_state_view.dart';
+import '../../../core/widgets/gps_requirement_dialog.dart';
 import '../../../data/models/ticket_model.dart';
 import '../../../data/models/tukang_model.dart';
 import '../../../domain/entities/ticket_status.dart';
 import '../../chat/pages/chat_page.dart';
+import '../../auth/bloc/auth_bloc.dart';
+import '../../auth/bloc/auth_event.dart';
 import '../../ticket/bloc/ticket_bloc.dart';
 import '../../ticket/bloc/ticket_event.dart';
 import '../../ticket/bloc/ticket_state.dart';
@@ -28,12 +33,29 @@ class MitraJobFeedPage extends StatefulWidget {
 class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
   late bool _isOnline;
   String _selectedCategoryFilter = 'all';
+  StreamSubscription? _radarWatcherSub;
 
   @override
   void initState() {
     super.initState();
     _isOnline = widget.tukang.isOnline;
     _fetchRadar();
+    _radarWatcherSub = FirebaseFirestore.instance
+        .collection('tickets')
+        .where('status', whereIn: ['OPEN', 'BIDDING'])
+        .snapshots()
+        .listen((_) {
+      if (mounted) _fetchRadar();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      GpsRequirementDialog.checkAndShow(context, isTukang: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _radarWatcherSub?.cancel();
+    super.dispose();
   }
 
   void _fetchRadar() {
@@ -957,10 +979,10 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: _buildQuickStatTile(
-                            icon: Icons.account_balance_wallet_rounded,
+                            icon: Icons.payments_rounded,
                             iconColor: AppColors.successGreen,
-                            title: NumberFormat.compactCurrency(locale: 'id', symbol: 'Rp ').format(widget.tukang.walletBalance),
-                            subtitle: 'Saldo Mitra',
+                            title: 'Tunai',
+                            subtitle: 'Metode Bayar',
                           ),
                         ),
                       ],
@@ -1028,6 +1050,8 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                       activeTrackColor: AppColors.successGreen.withValues(alpha: 0.4),
                       onChanged: (val) {
                         setState(() => _isOnline = val);
+                        final updatedTukang = widget.tukang.copyWith(isOnline: val);
+                        context.read<AuthBloc>().add(TukangProfileUpdatedEvent(updatedTukang));
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text(val ? 'Radar pekerjaan kembali ONLINE' : 'Radar pekerjaan kini OFFLINE')),
                         );
@@ -1122,7 +1146,16 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                   },
                   builder: (context, state) {
                     if (state is TicketLoadingState) {
-                      return const Center(child: CircularProgressIndicator(color: AppColors.textDark));
+                      return const AppLoadingView(message: 'Memindai radar tiket pekerjaan...');
+                    }
+
+                    if (state is TicketOperationFailureState) {
+                      return AppErrorView(
+                        title: 'Radar Gagal Memuat',
+                        message: state.message,
+                        retryLabel: 'Pindai Ulang Radar',
+                        onRetry: _fetchRadar,
+                      );
                     }
 
                     if (state is TicketListLoadedState) {
@@ -1429,7 +1462,12 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                       );
                     }
 
-                    return const SizedBox();
+                    return AppErrorView(
+                      title: 'Radar Gagal Memuat',
+                      message: 'Tidak dapat memperbarui radar tiket pekerjaan saat ini.',
+                      retryLabel: 'Pindai Ulang Radar',
+                      onRetry: _fetchRadar,
+                    );
                   },
                 ),
               ),

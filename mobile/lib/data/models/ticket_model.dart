@@ -118,7 +118,7 @@ class TicketModel {
   final FinalBill? finalBill;
   final List<String> beforePhotos;
   final List<String> afterPhotos;
-  final String? paymentMethod; // 'doku' | 'cash'
+  final String? paymentMethod; // 'CASH'
   final String? paymentStatus; // 'unpaid' | 'paid'
   final String? dokuInvoiceId;
   final int? ratingStars;
@@ -166,8 +166,12 @@ class TicketModel {
       description: map['description'] ?? '',
       photoUrls: List<String>.from(map['photoUrls'] ?? []),
       address: map['address'] ?? '',
-      lat: (locationMap['lat'] as num?)?.toDouble() ?? 0.0,
-      lng: (locationMap['lng'] as num?)?.toDouble() ?? 0.0,
+      lat: (locationMap['lat'] as num?)?.toDouble() ??
+          (map['lat'] as num?)?.toDouble() ??
+          0.0,
+      lng: (locationMap['lng'] as num?)?.toDouble() ??
+          (map['lng'] as num?)?.toDouble() ??
+          0.0,
       status: TicketStatus.fromCode(map['status'] ?? 'OPEN'),
       selectedTukangId: map['selectedTukangId'],
       selectedTukangName: map['selectedTukangName'],
@@ -185,13 +189,20 @@ class TicketModel {
       ratingStars: (map['rating'] as Map<String, dynamic>?)?['stars'] as int?,
       ratingReview: (map['rating'] as Map<String, dynamic>?)?['review'] as String?,
       cancelReason: map['cancelReason'],
-      createdAt: map['createdAt'] != null
-          ? DateTime.tryParse(map['createdAt'].toString()) ?? DateTime.now()
-          : DateTime.now(),
-      updatedAt: map['updatedAt'] != null
-          ? DateTime.tryParse(map['updatedAt'].toString()) ?? DateTime.now()
-          : DateTime.now(),
+      createdAt: _parseDate(map['createdAt']),
+      updatedAt: _parseDate(map['updatedAt']),
     );
+  }
+
+  static DateTime _parseDate(dynamic val) {
+    if (val == null) return DateTime.now();
+    if (val is DateTime) return val;
+    if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
+    try {
+      final dynamic dyn = val;
+      if (dyn.toDate != null) return dyn.toDate() as DateTime;
+    } catch (_) {}
+    return DateTime.tryParse(val.toString()) ?? DateTime.now();
   }
 
   Map<String, dynamic> toMap() {
@@ -204,6 +215,8 @@ class TicketModel {
       'description': description,
       'photoUrls': photoUrls,
       'address': address,
+      'lat': lat,
+      'lng': lng,
       'location': {'lat': lat, 'lng': lng},
       'status': status.code,
       'selectedTukangId': selectedTukangId,

@@ -4,7 +4,7 @@ import {
   Users, 
   Wrench, 
   UserCheck, 
-  WalletCards, 
+  Banknote, 
   ArrowUpRight, 
   Clock, 
   MapPin, 
@@ -17,7 +17,7 @@ import {
 import { useAdminData } from '../context/AdminDataContext';
 
 export default function DashboardPage() {
-  const { tukangList, usersList, ticketsList, withdrawalsList } = useAdminData();
+  const { tukangList, usersList, ticketsList } = useAdminData();
 
   const totalUsers = usersList.length;
   const verifiedTukang = tukangList.filter(t => t.verificationStatus === 'verified').length;
@@ -61,7 +61,7 @@ export default function DashboardPage() {
       unit: '0% fee peluncuran',
       change: '100% diterima mitra',
       trend: 'neutral',
-      icon: WalletCards,
+      icon: Banknote,
       color: 'purple'
     }
   ];
@@ -151,7 +151,7 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 mt-1">
-                  Mitra tukang baru belum bisa mengambil atau menawar order sebelum keahlian dan nomor rekening payout diperiksa admin.
+                  Mitra tukang baru belum bisa mengambil atau menawar order sebelum data diri dan keahlian diperiksa admin.
                 </p>
                 <div className="mt-3 flex items-center gap-3">
                   <Link

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/ticket_model.dart';
 import 'user_rating_modal.dart';
@@ -7,20 +8,24 @@ import '../bloc/payment_bloc.dart';
 import '../bloc/payment_event.dart';
 import '../bloc/payment_state.dart';
 
-class UserPaymentModal extends StatefulWidget {
+class UserPaymentModal extends StatelessWidget {
   final TicketModel ticket;
   const UserPaymentModal({super.key, required this.ticket});
 
-  @override
-  State<UserPaymentModal> createState() => _UserPaymentModalState();
-}
-
-class _UserPaymentModalState extends State<UserPaymentModal> {
-  String _selectedChannel = 'VA_BCA';
+  static void show(BuildContext context, TicketModel ticket) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => UserPaymentModal(ticket: ticket),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final double totalAmount = widget.ticket.finalBill?.totalAmount ?? 150000;
+    final currencyFormat = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+    final double totalAmount = ticket.finalBill?.totalAmount ?? 150000;
+    final items = ticket.finalBill?.items ?? [];
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -32,7 +37,7 @@ class _UserPaymentModalState extends State<UserPaymentModal> {
         listener: (context, state) {
           if (state is PaymentCompletedSuccessState) {
             Navigator.pop(context);
-            UserRatingModal.show(context, widget.ticket);
+            UserRatingModal.show(context, widgetOrTicket(state.ticket));
           } else if (state is PaymentFailureState) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.message), backgroundColor: AppColors.dangerRed),
@@ -40,138 +45,156 @@ class _UserPaymentModalState extends State<UserPaymentModal> {
           }
         },
         builder: (context, state) {
-          if (state is DokuInvoiceCreatedState) {
-            final inv = state.invoiceData;
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.qr_code_2, size: 54, color: AppColors.primary),
-                const SizedBox(height: 12),
-                Text('Invoice DOKU Sandbox #${inv['invoiceId']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                const SizedBox(height: 4),
-                Text('Total: Rp ${totalAmount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
-                const SizedBox(height: 16),
-
-                if (inv['paymentChannel'].toString().startsWith('VA_')) ...[
-                  const Text('Nomor Virtual Account DOKU:', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                  const SizedBox(height: 4),
-                  SelectableText(
-                    inv['vaNumber'],
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 2),
-                  ),
-                ] else if (inv['paymentChannel'] == 'QRIS') ...[
-                  Container(
-                    height: 140,
-                    width: 140,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.border),
-                      image: DecorationImage(image: NetworkImage(inv['qrisUrl']), fit: BoxFit.cover),
-                    ),
-                  ),
-                ] else ...[
-                  const Text('Bayar Tunai Langsung ke Tukang saat pengerjaan selesai.'),
-                ],
-                const SizedBox(height: 24),
-
-                ElevatedButton(
-                  onPressed: () {
-                    context.read<PaymentBloc>().add(
-                      ConfirmPaymentSuccessRequestedEvent(
-                        ticketId: widget.ticket.id,
-                        paymentMethod: inv['paymentChannel'],
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.successGreen,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text('Simulasi Webhook Pembayaran Lunas', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            );
-          }
+          final isLoading = state is PaymentLoadingState;
 
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Pilih Metode Pembayaran', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.payments_rounded, color: AppColors.successGreen, size: 22),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Pembayaran Tunai di Tempat',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textDark),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: AppColors.textMuted),
+                    onPressed: () => Navigator.pop(context),
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text('Total Tagihan Final: Rp ${totalAmount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
               const SizedBox(height: 16),
 
-              // ignore: deprecated_member_use
-              RadioListTile<String>(
-                value: 'VA_BCA',
-                // ignore: deprecated_member_use
-                groupValue: _selectedChannel,
-                title: const Text('Virtual Account BCA (DOKU)'),
-                secondary: const Icon(Icons.account_balance, color: AppColors.primary),
-                // ignore: deprecated_member_use
-                onChanged: (v) => setState(() => _selectedChannel = v!),
+              // Total Amount Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Total Tagihan Nota:',
+                          style: TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          currencyFormat.format(totalAmount),
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textDark),
+                        ),
+                      ],
+                    ),
+                    if (items.isNotEmpty) ...[
+                      const Divider(height: 18),
+                      ...items.map((it) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              it.title,
+                              style: const TextStyle(fontSize: 12, color: AppColors.textDark),
+                            ),
+                            Text(
+                              currencyFormat.format(it.amount),
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textDark),
+                            ),
+                          ],
+                        ),
+                      )),
+                    ],
+                  ],
+                ),
               ),
-              // ignore: deprecated_member_use
-              RadioListTile<String>(
-                value: 'VA_MANDIRI',
-                // ignore: deprecated_member_use
-                groupValue: _selectedChannel,
-                title: const Text('Virtual Account Mandiri (DOKU)'),
-                secondary: const Icon(Icons.account_balance, color: AppColors.primary),
-                // ignore: deprecated_member_use
-                onChanged: (v) => setState(() => _selectedChannel = v!),
+
+              const SizedBox(height: 14),
+
+              // Instruksi Pembayaran Tunai
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.info_outline_rounded, size: 20, color: Color(0xFF2563EB)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Silakan serahkan uang tunai sejumlah ${currencyFormat.format(totalAmount)} langsung kepada teknisi (${ticket.selectedTukangName ?? "Mitra Beres"}) di tempat.',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF1E40AF), height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              // ignore: deprecated_member_use
-              RadioListTile<String>(
-                value: 'QRIS',
-                // ignore: deprecated_member_use
-                groupValue: _selectedChannel,
-                title: const Text('QRIS Instant (GoPay/DANA/OVO/ShopeePay)'),
-                secondary: const Icon(Icons.qr_code_scanner, color: AppColors.primary),
-                // ignore: deprecated_member_use
-                onChanged: (v) => setState(() => _selectedChannel = v!),
-              ),
-              // ignore: deprecated_member_use
-              RadioListTile<String>(
-                value: 'CASH',
-                // ignore: deprecated_member_use
-                groupValue: _selectedChannel,
-                title: const Text('Tunai / Cash di Tempat'),
-                secondary: const Icon(Icons.payments, color: AppColors.successGreen),
-                // ignore: deprecated_member_use
-                onChanged: (v) => setState(() => _selectedChannel = v!),
-              ),
+
               const SizedBox(height: 20),
 
-              ElevatedButton(
-                onPressed: () {
-                  context.read<PaymentBloc>().add(
-                    CreateDokuInvoiceRequestedEvent(
-                      ticketId: widget.ticket.id,
-                      amount: totalAmount,
-                      paymentChannel: _selectedChannel,
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              // Tombol Konfirmasi Pembayaran Tunai
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: isLoading
+                      ? null
+                      : () {
+                          context.read<PaymentBloc>().add(
+                            ConfirmPaymentSuccessRequestedEvent(
+                              ticketId: ticket.id,
+                              paymentMethod: 'CASH',
+                            ),
+                          );
+                        },
+                  icon: isLoading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Icon(Icons.check_circle_rounded, color: Colors.white),
+                  label: Text(
+                    isLoading ? 'Memproses...' : 'Saya Sudah Bayar Tunai ke Mitra',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.successGreen,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    elevation: 2,
+                  ),
                 ),
-                child: const Text('Lanjut Pembayaran DOKU', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
+              const SizedBox(height: 10),
             ],
           );
         },
       ),
     );
   }
+
+  TicketModel widgetOrTicket(TicketModel updated) => updated;
 }

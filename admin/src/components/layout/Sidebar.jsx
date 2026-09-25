@@ -7,18 +7,16 @@ import {
   Wrench, 
   Users, 
   ClipboardList, 
-  WalletCards, 
   ShieldAlert,
   RotateCcw
 } from 'lucide-react';
 import { useAdminData } from '../../context/AdminDataContext';
 
 export default function Sidebar() {
-  const { tukangList, withdrawalsList, resetDemoData } = useAdminData();
+  const { tukangList, resetDemoData } = useAdminData();
 
   const pendingKycCount = tukangList.filter(t => t.verificationStatus === 'pending_verification').length;
   const suspendedCount = tukangList.filter(t => t.isSuspended).length;
-  const pendingWithdrawalCount = withdrawalsList.filter(w => w.status === 'pending').length;
 
   const navItems = [
     { to: '/', label: 'Ringkasan', icon: LayoutDashboard },
@@ -39,13 +37,6 @@ export default function Sidebar() {
     },
     { to: '/users', label: 'Daftar Pengguna', icon: Users },
     { to: '/tickets', label: 'Pantau Pekerjaan', icon: ClipboardList },
-    { 
-      to: '/withdrawals', 
-      label: 'Pencairan Dana', 
-      icon: WalletCards,
-      badge: pendingWithdrawalCount > 0 ? pendingWithdrawalCount : null,
-      badgeColor: 'bg-emerald-500 text-white'
-    },
   ];
 
   return (

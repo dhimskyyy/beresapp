@@ -10,7 +10,6 @@ import TukangMapPage from './pages/TukangMapPage';
 import TukangListPage from './pages/TukangListPage';
 import UserListPage from './pages/UserListPage';
 import TicketMonitorPage from './pages/TicketMonitorPage';
-import WithdrawalPage from './pages/WithdrawalPage';
 
 function AdminLogin({ onLogin }) {
   const [email, setEmail] = useState('');
@@ -69,7 +68,6 @@ function AdminShell() {
               <Route path="tukang" element={<TukangListPage />} />
               <Route path="users" element={<UserListPage />} />
               <Route path="tickets" element={<TicketMonitorPage />} />
-              <Route path="withdrawals" element={<WithdrawalPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/app_state_view.dart';
 import '../../../data/models/chat_message_model.dart';
 import '../../../data/models/ticket_model.dart';
 import '../../../domain/entities/ticket_status.dart';
@@ -540,6 +541,24 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isAuthorized = widget.currentUserId == _currentTicket.userId ||
+        widget.currentUserId == _currentTicket.selectedTukangId;
+
+    if (!isAuthorized) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Ruang Obrolan Terkunci'),
+          backgroundColor: AppColors.textDark,
+          foregroundColor: Colors.white,
+        ),
+        body: const AppErrorView(
+          title: 'Akses Obrolan Dibatasi',
+          message: 'Hanya pemilik tiket dan mitra yang telah terpilih/dikunci yang dapat membuka ruang percakapan tiket ini.',
+          icon: Icons.lock_outline_rounded,
+        ),
+      );
+    }
+
     final isTukang = widget.currentUserRole == 'tukang';
     final oppositeName = isTukang ? _currentTicket.userName : (_currentTicket.selectedTukangName ?? 'Mitra Tukang');
     final oppositePhone = isTukang ? '0812-3456-7890' : '0813-9988-7766';
@@ -623,27 +642,24 @@ class _ChatPageState extends State<ChatPage> {
               child: BlocBuilder<ChatBloc, ChatState>(
                 builder: (context, state) {
                   if (state is ChatLoadingState) {
-                    return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+                    return const AppLoadingView(message: 'Menghubungkan ke ruang percakapan...');
+                  }
+
+                  if (state is ChatFailureState) {
+                    return AppErrorView(
+                      title: 'Gagal Memuat Obrolan',
+                      message: state.message,
+                      onRetry: () => context.read<ChatBloc>().add(StartChatStreamEvent(_currentTicket.id)),
+                    );
                   }
 
                   if (state is ChatLoadedState) {
                     final messages = state.messages;
                     if (messages.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: AppColors.border)),
-                              child: const Icon(Icons.chat_bubble_outline_rounded, size: 36, color: AppColors.textMuted),
-                            ),
-                            const SizedBox(height: 12),
-                            const Text('Mulai Obrolan Pekerjaan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textDark)),
-                            const SizedBox(height: 4),
-                            const Text('Bicarakan rincian kendala, estimasi waktu, dan kesepakatan nota.', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                          ],
-                        ),
+                      return const AppEmptyView(
+                        title: 'Mulai Obrolan Pekerjaan',
+                        subtitle: 'Bicarakan rincian kendala, estimasi waktu, dan kesepakatan nota langsung dengan mitra/konsumen.',
+                        icon: Icons.chat_bubble_outline_rounded,
                       );
                     }
 
@@ -1100,7 +1116,7 @@ class _ChatPageState extends State<ChatPage> {
 
             const SizedBox(height: 4),
 
-            // Time & Double Check Status
+            // Time & Delivery Status Indicator (sending, sent, failed)
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1112,12 +1128,50 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ),
                 if (isMe) ...[
-                  const SizedBox(width: 4),
-                  Icon(
-                    msg.isRead ? Icons.done_all_rounded : Icons.done_rounded,
-                    size: 14,
-                    color: msg.isRead ? AppColors.safetyAmber : Colors.white70,
-                  ),
+                  const SizedBox(width: 5),
+                  if (msg.deliveryStatus == 'sending') ...[
+                    const SizedBox(
+                      width: 10,
+                      height: 10,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                    const Text('Mengirim', style: TextStyle(color: Colors.white70, fontSize: 9.5)),
+                  ] else if (msg.deliveryStatus == 'failed') ...[
+                    GestureDetector(
+                      onTap: () {
+                        context.read<ChatBloc>().add(RetrySendMessageEvent(
+                          ticketId: _currentTicket.id,
+                          failedMessage: msg,
+                        ));
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline_rounded, size: 14, color: AppColors.dangerRed),
+                          const SizedBox(width: 3),
+                          Text(
+                            'Gagal • Kirim Ulang',
+                            style: TextStyle(
+                              color: Colors.red.shade200,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else ...[
+                    Icon(
+                      msg.isRead ? Icons.done_all_rounded : Icons.done_rounded,
+                      size: 14,
+                      color: msg.isRead ? AppColors.safetyAmber : Colors.white70,
+                    ),
+                  ],
                 ],
               ],
             ),

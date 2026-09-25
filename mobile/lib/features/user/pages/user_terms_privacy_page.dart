@@ -143,7 +143,7 @@ class _UserTermsPrivacyPageState extends State<UserTermsPrivacyPage>
               'Kami hanya mengumpulkan data yang esensial untuk penyediaan layanan, meliputi:\n'
               '• Identitas dasar: Nama lengkap, alamat email, nomor telepon (WhatsApp).\n'
               '• Data geolokasi: Koordinat titik peta dan alamat tujuan kedatangan tukang.\n'
-              '• Riwayat transaksi: Catatan pemesanan, invoice, dan riwayat top-up/pembayaran.',
+              '• Riwayat transaksi: Catatan pemesanan, invoice kesepakatan, dan riwayat status pembayaran.',
         ),
         const SizedBox(height: 12),
         _buildInfoCard(

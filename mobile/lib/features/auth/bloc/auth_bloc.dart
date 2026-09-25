@@ -21,8 +21,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<UserProfileUpdatedEvent>((event, emit) {
       emit(UserAuthenticatedState(event.user));
     });
-    on<TukangProfileUpdatedEvent>((event, emit) {
-      emit(TukangAuthenticatedState(event.tukang));
+    on<TukangProfileUpdatedEvent>((event, emit) async {
+      try {
+        final updated = await authRepository.updateTukangProfile(event.tukang);
+        emit(TukangAuthenticatedState(updated));
+      } catch (e) {
+        // If Firestore update fails, keep previous state and print error
+        // so the app doesn't unexpectedly log out
+      }
     });
   }
 

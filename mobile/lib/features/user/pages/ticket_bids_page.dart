@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -29,6 +31,31 @@ class TicketBidsPage extends StatefulWidget {
 class _TicketBidsPageState extends State<TicketBidsPage> {
   BidSortOption _selectedSort = BidSortOption.cheapest;
   final _currencyFormat = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _ticketSub;
+  late TicketModel _liveTicket;
+
+  @override
+  void initState() {
+    super.initState();
+    _liveTicket = widget.ticket;
+    _ticketSub = FirebaseFirestore.instance
+        .collection('tickets')
+        .doc(widget.ticket.id)
+        .snapshots()
+        .listen((snap) {
+      if (snap.exists && snap.data() != null && mounted) {
+        setState(() {
+          _liveTicket = TicketModel.fromMap(snap.data()!, snap.id);
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticketSub?.cancel();
+    super.dispose();
+  }
 
   List<BidModel> _getSortedBids(List<BidModel> bids) {
     final list = List<BidModel>.from(bids);
@@ -270,8 +297,8 @@ class _TicketBidsPageState extends State<TicketBidsPage> {
         builder: (context, state) {
           // Use current ticket from state if available
           final currentTicket = (state is TicketListLoadedState)
-              ? state.tickets.firstWhere((t) => t.id == widget.ticket.id, orElse: () => widget.ticket)
-              : widget.ticket;
+              ? state.tickets.firstWhere((t) => t.id == widget.ticket.id, orElse: () => _liveTicket)
+              : _liveTicket;
 
           final isLocked = currentTicket.status != TicketStatus.open && currentTicket.status != TicketStatus.bidding;
           final sortedBids = _getSortedBids(currentTicket.bids);

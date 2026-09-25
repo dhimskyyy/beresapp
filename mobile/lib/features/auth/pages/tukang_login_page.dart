@@ -123,7 +123,7 @@ class _TukangLoginPageState extends State<TukangLoginPage> {
                         children: [
                           Icon(Icons.bolt_rounded, size: 16, color: Color(0xFFD97706)),
                           SizedBox(width: 6),
-                          Text('Komisi 0% • Pencairan Dana Instan ke Rekening', style: TextStyle(color: Color(0xFF92400E), fontSize: 11, fontWeight: FontWeight.bold)),
+                          Text('Komisi 0% • Pembayaran Tunai Langsung di Tempat', style: TextStyle(color: Color(0xFF92400E), fontSize: 11, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -154,7 +154,7 @@ class _TukangLoginPageState extends State<TukangLoginPage> {
                             ),
                             const SizedBox(height: 4),
                             const Text(
-                              'Akses radar orderan kerja dan dompet penghasilan',
+                              'Akses radar orderan kerja dan kelola pekerjaan',
                               style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                             ),
                             const SizedBox(height: 20),

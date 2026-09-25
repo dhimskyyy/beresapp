@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/service_categories.dart';
+import '../../../core/widgets/app_state_view.dart';
 import '../../../data/models/tukang_model.dart';
 import '../../../domain/entities/ticket_status.dart';
 import '../../chat/pages/chat_page.dart';
@@ -46,39 +47,27 @@ class _MitraChatListPageState extends State<MitraChatListPage> {
       ),
       body: BlocBuilder<TicketBloc, TicketState>(
         builder: (context, state) {
-          if (state is! TicketListLoadedState || state.tickets.isEmpty) {
-            return Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: AppColors.textDark.withValues(alpha: 0.08),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.chat_bubble_outline_rounded, size: 56, color: AppColors.textDark),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Belum Ada Percakapan',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textDark),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Percakapan dengan konsumen akan muncul di sini setelah Anda terpilih / mengunci orderan pada radar pekerjaan.',
-                      style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
+          if (state is TicketLoadingState) {
+            return const AppLoadingView(message: 'Memuat pesan konsumen...');
+          }
+
+          if (state is TicketOperationFailureState) {
+            return AppErrorView(
+              message: state.message,
+              onRetry: () => context.read<TicketBloc>().add(FetchTukangActiveTicketsEvent(widget.tukang.id)),
             );
           }
 
-          var tickets = state.tickets;
+          if (state is TicketListLoadedState) {
+            if (state.tickets.isEmpty) {
+              return const AppEmptyView(
+                icon: Icons.chat_bubble_outline_rounded,
+                title: 'Belum Ada Percakapan',
+                subtitle: 'Percakapan dengan konsumen akan muncul di sini setelah Anda terpilih / mengunci orderan pada radar pekerjaan.',
+              );
+            }
+
+            var tickets = state.tickets;
           if (_searchQuery.isNotEmpty) {
             tickets = tickets.where((t) {
               final user = t.userName;
@@ -275,8 +264,14 @@ class _MitraChatListPageState extends State<MitraChatListPage> {
               ),
             ],
           );
-        },
-      ),
-    );
-  }
+        }
+
+        return AppErrorView(
+          message: 'Terjadi kesalahan saat memuat obrolan konsumen.',
+          onRetry: () => context.read<TicketBloc>().add(FetchTukangActiveTicketsEvent(widget.tukang.id)),
+        );
+      },
+    ),
+  );
+}
 }

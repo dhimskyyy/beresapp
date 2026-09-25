@@ -28,13 +28,6 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
   // Step 2: Keahlian (Multi-select)
   final List<String> _selectedServices = [];
 
-  // Step 3: Payout Accounts
-  final List<PayoutAccount> _payoutAccounts = [];
-  String _selectedProviderType = 'bank';
-  String _selectedProvider = 'BCA';
-  final _accountNumberController = TextEditingController();
-  final _accountNameController = TextEditingController();
-
   void _calculateAge(DateTime birthDate) {
     final now = DateTime.now();
     int age = now.year - birthDate.year;
@@ -44,28 +37,6 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
     setState(() {
       _birthDate = birthDate;
       _age = age;
-    });
-  }
-
-  void _addPayoutAccount() {
-    if (_accountNumberController.text.isEmpty || _accountNameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lengkapi nomor dan nama pemilik rekening')),
-      );
-      return;
-    }
-
-    setState(() {
-      _payoutAccounts.add(
-        PayoutAccount(
-          type: _selectedProviderType,
-          provider: _selectedProvider,
-          accountNumber: _accountNumberController.text.trim(),
-          accountName: _accountNameController.text.trim(),
-        ),
-      );
-      _accountNumberController.clear();
-      _accountNameController.clear();
     });
   }
 
@@ -82,10 +53,6 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pilih minimal 1 keahlian')));
       return;
     }
-    if (_payoutAccounts.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tambahkan minimal 1 rekening payout')));
-      return;
-    }
 
     context.read<AuthBloc>().add(
       TukangRegisterRequestedEvent(
@@ -96,7 +63,7 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
         birthDate: _birthDate!.toIso8601String().split('T')[0],
         age: _age,
         services: _selectedServices,
-        payoutAccounts: _payoutAccounts,
+        payoutAccounts: const [],
         ktpPath: '',
       ),
     );
@@ -156,7 +123,7 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
               type: StepperType.horizontal,
               currentStep: _currentStep,
               onStepContinue: () {
-                if (_currentStep < 2) {
+                if (_currentStep < 1) {
                   setState(() => _currentStep++);
                 } else {
                   _submitOnboarding();
@@ -181,7 +148,7 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           child: Text(
-                            _currentStep == 2 ? 'Kirim Pendaftaran' : 'Lanjut',
+                            _currentStep == 1 ? 'Kirim Pendaftaran' : 'Lanjut',
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -299,86 +266,6 @@ class _TukangOnboardingPageState extends State<TukangOnboardingPage> {
                           );
                         }).toList(),
                       ),
-                    ],
-                  ),
-                ),
-
-                // Step 3: Payout Accounts
-                Step(
-                  title: const Text('Rekening'),
-                  isActive: _currentStep >= 2,
-                  content: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Tambahkan Rekening Bank / E-Wallet Pencairan:',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _selectedProviderType,
-                              items: const [
-                                DropdownMenuItem(value: 'bank', child: Text('Bank Transfer')),
-                                DropdownMenuItem(value: 'ewallet', child: Text('E-Wallet')),
-                              ],
-                              onChanged: (val) {
-                                setState(() {
-                                  _selectedProviderType = val!;
-                                  _selectedProvider = val == 'bank' ? 'BCA' : 'DANA';
-                                });
-                              },
-                              decoration: const InputDecoration(labelText: 'Tipe Account'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _selectedProvider,
-                              items: (_selectedProviderType == 'bank'
-                                      ? ['BCA', 'BRI', 'BNI', 'MANDIRI']
-                                      : ['DANA', 'GOPAY', 'OVO', 'SHOPEEPAY'])
-                                  .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                                  .toList(),
-                              onChanged: (val) => setState(() => _selectedProvider = val!),
-                              decoration: const InputDecoration(labelText: 'Penyedia'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _accountNumberController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Nomor Rekening / No. HP E-Wallet'),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _accountNameController,
-                        decoration: const InputDecoration(labelText: 'Nama Pemilik Rekening'),
-                      ),
-                      const SizedBox(height: 12),
-                      ElevatedButton.icon(
-                        onPressed: _addPayoutAccount,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Tambah Rekening'),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryLight),
-                      ),
-                      const SizedBox(height: 16),
-                      if (_payoutAccounts.isNotEmpty) ...[
-                        const Text('Daftar Rekening Tersimpan:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                        const SizedBox(height: 8),
-                        ..._payoutAccounts.map((acc) => Card(
-                              margin: const EdgeInsets.only(bottom: 6),
-                              child: ListTile(
-                                dense: true,
-                                title: Text('${acc.provider} - ${acc.accountNumber}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                subtitle: Text('a.n ${acc.accountName}'),
-                              ),
-                            )),
-                      ]
                     ],
                   ),
                 ),
