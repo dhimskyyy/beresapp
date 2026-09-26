@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -31,8 +32,6 @@ class MitraActiveJobPage extends StatefulWidget {
 
 class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
   final ImagePicker _picker = ImagePicker();
-  final _itemTitleController = TextEditingController();
-  final _itemAmountController = TextEditingController();
   
   late TicketModel _currentTicket;
   List<BillItem> _billItems = [];
@@ -64,10 +63,26 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
   }
 
   @override
+  void didUpdateWidget(covariant MitraActiveJobPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.ticket.id != widget.ticket.id ||
+        oldWidget.ticket.status != widget.ticket.status ||
+        oldWidget.ticket.updatedAt != widget.ticket.updatedAt ||
+        oldWidget.ticket.finalBill != widget.ticket.finalBill) {
+      setState(() {
+        _currentTicket = widget.ticket;
+        if (_currentTicket.finalBill != null) {
+          _billItems = List.from(_currentTicket.finalBill!.items);
+        } else {
+          _billItems = [];
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _ticketSub?.cancel();
-    _itemTitleController.dispose();
-    _itemAmountController.dispose();
     super.dispose();
   }
 
@@ -84,7 +99,21 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
   /// Safe Image Widget
   Widget _buildSafeImage(String path, {double width = 72, double height = 72, double radius = 10}) {
     Widget img;
-    if (path.startsWith('http')) {
+    if (path.startsWith('data:image')) {
+      try {
+        final base64String = path.split(',').last;
+        final bytes = base64Decode(base64String);
+        img = Image.memory(
+          bytes,
+          width: width,
+          height: height,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _fallbackImage(width, height),
+        );
+      } catch (_) {
+        img = _fallbackImage(width, height);
+      }
+    } else if (path.startsWith('http')) {
       img = Image.network(
         path,
         width: width,
@@ -247,6 +276,16 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
             ),
           );
         } else if (_currentTicket.status == TicketStatus.arrived) {
+          final bill = _currentTicket.finalBill;
+          if (bill == null || !bill.approvedByUser) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Nota jasa wajib dibuat dan disetujui konsumen di room chat sebelum memulai pengerjaan!'),
+                backgroundColor: AppColors.dangerRed,
+              ),
+            );
+            return;
+          }
           context.read<TicketBloc>().add(
             UpdateTicketStatusRequestedEvent(
               ticketId: _currentTicket.id,
@@ -259,96 +298,6 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal mengambil foto: $e')));
     }
-  }
-
-  /// Dialog Tambah Item Tagihan Material / Jasa
-  void _showAddBillItemDialog({String? initialTitle, double? initialAmount}) {
-    if (initialTitle != null) {
-      _itemTitleController.text = initialTitle;
-    }
-    if (initialAmount != null) {
-      _itemAmountController.text = initialAmount.toStringAsFixed(0);
-    }
-
-    showDialog(
-      context: context,
-      builder: (diagCtx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 20),
-            ),
-            const SizedBox(width: 10),
-            const Text('Input Item Tagihan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Nama Tindakan / Sparepart:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _itemTitleController,
-              decoration: InputDecoration(
-                hintText: 'Contoh: Cuci AC / Tambah Freon R32',
-                hintStyle: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                filled: true,
-                fillColor: AppColors.background,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Text('Biaya Satuan (Rp):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _itemAmountController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                prefixText: 'Rp ',
-                hintText: '75000',
-                hintStyle: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                filled: true,
-                fillColor: AppColors.background,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              _itemTitleController.clear();
-              _itemAmountController.clear();
-              Navigator.pop(diagCtx);
-            },
-            child: const Text('Batal', style: TextStyle(color: AppColors.textMuted)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final amount = double.tryParse(_itemAmountController.text.trim()) ?? 0;
-              if (_itemTitleController.text.trim().isEmpty || amount <= 0) return;
-              setState(() {
-                _billItems.add(BillItem(title: _itemTitleController.text.trim(), amount: amount));
-              });
-              _itemTitleController.clear();
-              _itemAmountController.clear();
-              Navigator.pop(diagCtx);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.textDark, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-            child: const Text('Simpan Item', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
   }
 
   /// Interactive GPS Navigation Modal Bottom Sheet
@@ -735,7 +684,7 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
         builder: (context, state) {
           final t = _currentTicket;
           final status = t.status;
-          final double totalBill = _billItems.fold(0, (sum, i) => sum + i.amount);
+          final double totalBill = _billItems.fold(0, (prev, i) => prev + i.amount);
 
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
@@ -1237,7 +1186,9 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
+        border: Border.all(
+          color: isApproved ? AppColors.successGreen.withValues(alpha: 0.5) : AppColors.border.withValues(alpha: 0.8),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1252,71 +1203,95 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
                   Text('Rincian Nota Material & Jasa', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textDark)),
                 ],
               ),
-              if (finalBill != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: isApproved ? AppColors.successGreen.withValues(alpha: 0.12) : AppColors.safetyAmber.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(isApproved ? Icons.check_circle_rounded : Icons.hourglass_top_rounded,
-                          size: 12, color: isApproved ? AppColors.successGreen : AppColors.safetyAmber),
-                      const SizedBox(width: 3),
-                      Text(
-                        isApproved ? 'Disetujui' : 'Menunggu User',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: isApproved ? AppColors.successGreen : AppColors.textDark,
-                        ),
-                      ),
-                    ],
-                  ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isApproved
+                      ? AppColors.successGreen.withValues(alpha: 0.12)
+                      : (finalBill != null ? AppColors.safetyAmber.withValues(alpha: 0.15) : Colors.grey.shade100),
+                  borderRadius: BorderRadius.circular(8),
                 ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isApproved ? Icons.check_circle_rounded : (finalBill != null ? Icons.hourglass_top_rounded : Icons.pending_outlined),
+                      size: 12,
+                      color: isApproved ? AppColors.successGreen : (finalBill != null ? AppColors.safetyAmber : AppColors.textMuted),
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      isApproved ? 'Telah Disetujui' : (finalBill != null ? 'Menunggu Persetujuan' : 'Belum Dibuat'),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: isApproved ? AppColors.successGreen : (finalBill != null ? const Color(0xFFB45309) : AppColors.textMuted),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 4),
-          const Text('Catat rincian sparepart yang dibeli atau biaya jasa tambahan.', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
-
-          const SizedBox(height: 12),
-
-          // Quick Chip Suggestions
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildQuickBillChip('+ Cuci Standar (75rb)', 'Cuci Unit Standar', 75000),
-                const SizedBox(width: 6),
-                _buildQuickBillChip('+ Tambah Freon (150rb)', 'Tambah Freon R32', 150000),
-                const SizedBox(width: 6),
-                _buildQuickBillChip('+ Ganti Pipa (85rb)', 'Ganti Pipa & Selang', 85000),
-                const SizedBox(width: 6),
-                _buildQuickBillChip('+ Jasa Bongkar (50rb)', 'Biaya Bongkar Pasang', 50000),
-              ],
-            ),
+          const SizedBox(height: 6),
+          Text(
+            isApproved
+                ? 'Nota telah disetujui konsumen melalui Chat room.'
+                : 'Nota biaya jasa ditulis, ditetapkan, dan disetujui melalui Chat room bersama konsumen.',
+            style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
           ),
-
           const SizedBox(height: 12),
 
-          // Itemized list
-          if (_billItems.isEmpty) ...[
+          if (finalBill == null || finalBill.items.isEmpty) ...[
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: AppColors.background,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.border),
               ),
-              child: const Center(
-                child: Text('Belum ada item tagihan yang dimasukkan.', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+              child: Column(
+                children: [
+                  const Icon(Icons.chat_outlined, size: 28, color: AppColors.textMuted),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Nota belum dibuat',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textDark),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Silakan buka room Chat untuk menentukan rincian dan harga bersama konsumen.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ChatPage(
+                            ticket: _currentTicket,
+                            currentUserId: widget.tukang.id,
+                            currentUserRole: 'tukang',
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.chat_rounded, color: Colors.white, size: 16),
+                    label: const Text('Buka Chat & Buat Nota', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    ),
+                  ),
+                ],
               ),
             ),
           ] else ...[
-            ..._billItems.asMap().entries.map((entry) {
+            ...finalBill.items.asMap().entries.map((entry) {
               final idx = entry.key;
               final item = entry.value;
               return Container(
@@ -1336,15 +1311,6 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
                     const SizedBox(width: 8),
                     Expanded(child: Text(item.title, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textDark))),
                     Text(_currencyFormat.format(item.amount), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textDark)),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _billItems.removeAt(idx);
-                        });
-                      },
-                      child: const Icon(Icons.remove_circle_outline_rounded, color: AppColors.dangerRed, size: 18),
-                    ),
                   ],
                 ),
               );
@@ -1353,72 +1319,42 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Total Rincian Tagihan:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textDark)),
-                Text(_currencyFormat.format(totalBill), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary)),
+                const Text('Total Kesepakatan Nota:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textDark)),
+                Text(
+                  _currencyFormat.format(finalBill.totalAmount),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
+                ),
               ],
             ),
-          ],
-
-          const SizedBox(height: 12),
-
-          // Action Buttons: Tambah Item & Kirim ke User
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _showAddBillItemDialog(),
-                  icon: const Icon(Icons.add_rounded, size: 16, color: AppColors.textDark),
-                  label: const Text('Input Item Kustom', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textDark)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.border),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ),
-              if (_billItems.isNotEmpty) ...[
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      context.read<TicketBloc>().add(
-                        SubmitFinalBillRequestedEvent(
-                          ticketId: _currentTicket.id,
-                          items: _billItems,
-                        ),
-                      );
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Nota berhasil dikirim ke ruang chat konsumen!'), backgroundColor: AppColors.successGreen),
-                      );
-                    },
-                    icon: const Icon(Icons.send_rounded, size: 14, color: Colors.white),
-                    label: const Text('Kirim Tagihan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.textDark,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ChatPage(
+                      ticket: _currentTicket,
+                      currentUserId: widget.tukang.id,
+                      currentUserRole: 'tukang',
                     ),
                   ),
-                ),
-              ],
-            ],
-          ),
+                );
+              },
+              icon: const Icon(Icons.chat_rounded, size: 16, color: AppColors.textDark),
+              label: Text(
+                isApproved ? 'Lihat Nota di Room Chat' : 'Buka Chat Room (Edit / Cek Persetujuan)',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textDark),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.border),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                minimumSize: const Size.fromHeight(40),
+              ),
+            ),
+          ],
         ],
       ),
-    );
-  }
-
-  Widget _buildQuickBillChip(String label, String title, double amount) {
-    return ActionChip(
-      label: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textDark)),
-      backgroundColor: AppColors.background,
-      side: const BorderSide(color: AppColors.border),
-      padding: EdgeInsets.zero,
-      onPressed: () {
-        setState(() {
-          _billItems.add(BillItem(title: title, amount: amount));
-        });
-      },
     );
   }
 
@@ -1467,16 +1403,112 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
     }
 
     if (status == TicketStatus.arrived) {
-      return ElevatedButton.icon(
-        onPressed: () => _showImageSourceDialog(true),
-        icon: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 22),
-        label: const Text('📸 Ambil Foto Before & Mulai Pengerjaan', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          elevation: 2,
-        ),
+      final bill = t.finalBill;
+      final isBillApproved = bill != null && bill.approvedByUser;
+
+      if (!isBillApproved) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFBEB),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFFDE68A)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    bill == null ? Icons.lock_clock_rounded : Icons.hourglass_top_rounded,
+                    color: const Color(0xFFD97706),
+                    size: 22,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      bill == null
+                          ? 'Wajib Sepakati Nota Jasa Dahulu'
+                          : 'Menunggu Persetujuan Nota (${_currencyFormat.format(bill.totalAmount)})',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF92400E)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                bill == null
+                    ? 'Anda telah tiba di lokasi konsumen. Silakan buka room chat untuk menetapkan rincian nota jasa bersama konsumen sebelum memulai pengerjaan.'
+                    : 'Nota jasa telah dikirim ke room chat. Konsumen harus menekan tombol "Setujui Nota" di room chat sebelum Anda dapat memulai pengerjaan.',
+                style: const TextStyle(fontSize: 12, color: Color(0xFFB45309), height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChatPage(
+                        ticket: t,
+                        currentUserId: widget.tukang.id,
+                        currentUserRole: 'tukang',
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.chat_rounded, color: Colors.white, size: 18),
+                label: Text(
+                  bill == null ? 'Buka Chat & Tetapkan Nota' : 'Buka Chat Room (Cek Persetujuan)',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 2,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFECFDF5),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.successGreen.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: AppColors.successGreen, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Nota disetujui konsumen (${_currencyFormat.format(bill.totalAmount)}). Silakan mulai pengerjaan.',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.successGreen),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => _showImageSourceDialog(true),
+            icon: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 22),
+            label: const Text('📸 Ambil Foto Before & Mulai Pengerjaan', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 2,
+            ),
+          ),
+        ],
       );
     }
 
@@ -1570,7 +1602,13 @@ class _MitraActiveJobPageState extends State<MitraActiveJobPage> {
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                } else {
+                  context.read<TicketBloc>().add(FetchTukangActiveTicketsEvent(widget.tukang.id));
+                }
+              },
               icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textDark),
               label: const Text('Kembali ke Radar Pekerjaan', style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold)),
               style: OutlinedButton.styleFrom(

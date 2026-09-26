@@ -3,7 +3,8 @@ import {
   collection, 
   doc, 
   onSnapshot, 
-  setDoc 
+  setDoc,
+  deleteDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { 
@@ -73,6 +74,22 @@ const normalizeTukang = (docData, docId) => {
   };
 };
 
+const normalizeUser = (docData, docId) => {
+  return {
+    ...docData,
+    id: docId || docData.id || '',
+    name: docData.name || 'Pengguna Beres',
+    email: docData.email || '-',
+    phone: docData.phone || '-',
+    avatar: docData.photoUrl || docData.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    address: docData.address || 'Alamat Belum Diatur',
+    totalOrders: docData.totalOrders || 0,
+    totalSpent: docData.totalSpent || 0,
+    status: docData.status || 'Aktif',
+    createdAt: docData.createdAt || '-',
+  };
+};
+
 const mergeTickets = (cloudDocs) => {
   const mergedMap = new Map();
   for (const item of cloudDocs) {
@@ -89,6 +106,14 @@ const mergeTukang = (cloudDocs) => {
   const mergedMap = new Map();
   for (const item of cloudDocs) {
     mergedMap.set(item.id, normalizeTukang(item, item.id));
+  }
+  return Array.from(mergedMap.values());
+};
+
+const mergeUsers = (cloudDocs) => {
+  const mergedMap = new Map();
+  for (const item of cloudDocs) {
+    mergedMap.set(item.id, normalizeUser(item, item.id));
   }
   return Array.from(mergedMap.values());
 };
@@ -195,7 +220,12 @@ export function AdminDataProvider({ children }) {
         setIsLiveConnected(true);
         setDataLoading(prev => ({ ...prev, users: false }));
         setDataErrors(prev => ({ ...prev, users: null }));
-        setUsersList(snapshot.docs.map((item) => ({ ...item.data(), id: item.id })));
+        if (!snapshot.empty) {
+          const docs = snapshot.docs.map((item) => ({ ...item.data(), id: item.id }));
+          setUsersList(() => mergeUsers(docs));
+        } else {
+          setUsersList([]);
+        }
       }, (error) => {
         console.warn('Firestore users realtime listener notice:', error);
         setDataLoading(prev => ({ ...prev, users: false }));
@@ -284,6 +314,28 @@ export function AdminDataProvider({ children }) {
     }
   };
 
+  // Delete Tukang (cleanup orphaned / duplicate records)
+  const deleteTukang = async (tukangId) => {
+    try {
+      await deleteDoc(doc(db, 'tukang', tukangId));
+      showToast(`Data Mitra #${tukangId} berhasil dihapus dari sistem.`);
+    } catch (e) {
+      console.warn('Firestore deleteTukang error:', e);
+      showToast('Gagal menghapus data mitra. Coba lagi.', 'error');
+    }
+  };
+
+  // Delete User (cleanup orphaned / duplicate records)
+  const deleteUser = async (userId) => {
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+      showToast(`Data Pengguna #${userId} berhasil dihapus dari sistem.`);
+    } catch (e) {
+      console.warn('Firestore deleteUser error:', e);
+      showToast('Gagal menghapus data pengguna. Coba lagi.', 'error');
+    }
+  };
+
   // Reset to demo mock data
   const resetDemoData = () => {
     if (!demoMode) {
@@ -307,6 +359,8 @@ export function AdminDataProvider({ children }) {
       rejectKyc,
       suspendTukang,
       unsuspendTukang,
+      deleteTukang,
+      deleteUser,
       resetDemoData,
       isLiveConnected,
       toast

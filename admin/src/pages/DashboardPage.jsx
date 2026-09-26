@@ -236,8 +236,8 @@ export default function DashboardPage() {
                 <div className="sm:text-right shrink-0">
                   <p className="text-sm font-bold text-slate-900">
                     {ticket.finalBill?.totalAmount 
-                      ? `Rp ${ticket.finalBill.totalAmount.toLocaleString('id-ID')}` 
-                      : (ticket.bids[0]?.estimatedPrice ? `Estimasi Rp ${ticket.bids[0].estimatedPrice.toLocaleString('id-ID')}` : 'Belum ada harga')}
+                      ? `Rp ${(ticket.finalBill.totalAmount || 0).toLocaleString('id-ID')}` 
+                      : (ticket.bids?.[0]?.estimatedPrice ? `Estimasi Rp ${(ticket.bids[0].estimatedPrice || 0).toLocaleString('id-ID')}` : 'Belum ada harga')}
                   </p>
                   <p className="text-[11px] text-slate-400 mt-0.5">{ticket.createdAt}</p>
                 </div>

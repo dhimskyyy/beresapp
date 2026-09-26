@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,7 +9,6 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/app_state_view.dart';
 import '../../../data/models/chat_message_model.dart';
 import '../../../data/models/ticket_model.dart';
-import '../../../domain/entities/ticket_status.dart';
 import '../../ticket/bloc/ticket_bloc.dart';
 import '../../ticket/bloc/ticket_event.dart';
 import '../../ticket/bloc/ticket_state.dart';
@@ -89,7 +89,21 @@ class _ChatPageState extends State<ChatPage> {
   /// Safe Image Builder
   Widget _buildSafeImage(String path, {double? width, double height = 180, double radius = 12}) {
     Widget img;
-    if (path.startsWith('http')) {
+    if (path.startsWith('data:image')) {
+      try {
+        final base64String = path.split(',').last;
+        final bytes = base64Decode(base64String);
+        img = Image.memory(
+          bytes,
+          width: width ?? double.infinity,
+          height: height,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _imageFallback(width, height),
+        );
+      } catch (_) {
+        img = _imageFallback(width, height);
+      }
+    } else if (path.startsWith('http')) {
       img = Image.network(
         path,
         width: width ?? double.infinity,
@@ -172,9 +186,7 @@ class _ChatPageState extends State<ChatPage> {
   void _showCreateInvoiceDialog() {
     final List<BillItem> items = _currentTicket.finalBill != null
         ? List.from(_currentTicket.finalBill!.items)
-        : [
-            BillItem(title: 'Jasa Pengerjaan ${_currentTicket.category.toUpperCase()}', amount: 100000),
-          ];
+        : [];
 
     final titleCtrl = TextEditingController();
     final amountCtrl = TextEditingController();
@@ -229,7 +241,7 @@ class _ChatPageState extends State<ChatPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text('Invoice / Nota Kesepakatan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textDark)),
-                              Text('Kirim rincian biaya resmi ke room chat', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                              Text('Tentukan rincian biaya yang disepakati bersama konsumen', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
                             ],
                           ),
                         ],
@@ -238,24 +250,6 @@ class _ChatPageState extends State<ChatPage> {
                     ],
                   ),
                   const Divider(height: 16),
-
-                  // Quick Suggestion Chips
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildInvoiceQuickChip('+ Cuci Standar (75rb)', 'Cuci Unit Standar', 75000, items, setDialogState),
-                        const SizedBox(width: 6),
-                        _buildInvoiceQuickChip('+ Tambah Freon (150rb)', 'Tambah Freon R32', 150000, items, setDialogState),
-                        const SizedBox(width: 6),
-                        _buildInvoiceQuickChip('+ Ganti Pipa (85rb)', 'Ganti Pipa & Selang', 85000, items, setDialogState),
-                        const SizedBox(width: 6),
-                        _buildInvoiceQuickChip('+ Jasa Bongkar (50rb)', 'Biaya Bongkar Pasang', 50000, items, setDialogState),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
 
                   // Input Item Baru
                   Row(
@@ -396,20 +390,6 @@ class _ChatPageState extends State<ChatPage> {
             );
           },
         );
-      },
-    );
-  }
-
-  Widget _buildInvoiceQuickChip(String label, String title, double amount, List<BillItem> items, StateSetter setDialogState) {
-    return ActionChip(
-      label: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textDark)),
-      backgroundColor: AppColors.background,
-      side: const BorderSide(color: AppColors.border),
-      padding: EdgeInsets.zero,
-      onPressed: () {
-        setDialogState(() {
-          items.add(BillItem(title: title, amount: amount));
-        });
       },
     );
   }
@@ -962,26 +942,20 @@ class _ChatPageState extends State<ChatPage> {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       context.read<TicketBloc>().add(ApproveFinalBillRequestedEvent(_currentTicket.id));
-                      context.read<TicketBloc>().add(
-                        UpdateTicketStatusRequestedEvent(
-                          ticketId: _currentTicket.id,
-                          newStatus: TicketStatus.onTheWay,
-                        ),
-                      );
 
                       _sendMessage(
-                        customText: '✅ Saya telah menyetujui Nota/Invoice sebesar ${_currencyFormat.format(bill.totalAmount)}. Pekerjaan resmi dimulai!',
+                        customText: '✅ Saya telah menyetujui Nota Kesepakatan sebesar ${_currencyFormat.format(bill.totalAmount)}. Mitra tukang dapat mulai melakukan pengerjaan.',
                       );
 
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('✓ Invoice disetujui! Pekerjaan resmi dimulai.'),
+                          content: Text('✓ Nota disetujui! Mitra tukang sekarang dapat memulai pengerjaan.'),
                           backgroundColor: AppColors.successGreen,
                         ),
                       );
                     },
                     icon: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
-                    label: const Text('Setujui & Mulai', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                    label: const Text('Setujui Nota', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.successGreen,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -1021,14 +995,16 @@ class _ChatPageState extends State<ChatPage> {
                 color: AppColors.successGreen.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.verified_user_rounded, color: AppColors.successGreen, size: 14),
-                  SizedBox(width: 6),
+                  const Icon(Icons.verified_user_rounded, color: AppColors.successGreen, size: 14),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Persetujuan nota tuntas • Pengerjaan dilindungi Beres Guarantee',
-                      style: TextStyle(color: AppColors.successGreen, fontSize: 11, fontWeight: FontWeight.bold),
+                      isTukang
+                          ? 'Nota telah disetujui konsumen • Silakan kembali ke tab Pengerjaan untuk memulai'
+                          : 'Persetujuan nota tuntas • Pengerjaan dilindungi Beres Guarantee',
+                      style: const TextStyle(color: AppColors.successGreen, fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],

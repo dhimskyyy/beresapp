@@ -140,7 +140,9 @@ class TicketBloc extends Bloc<TicketEvent, TicketState> {
   }
 
   Future<void> _onFetchUserTickets(FetchUserTicketsEvent event, Emitter<TicketState> emit) async {
-    emit(TicketLoadingState());
+    if (state is! TicketListLoadedState && state is! TukangLockedSuccessState) {
+      emit(TicketLoadingState());
+    }
     try {
       final list = await ticketRepository.getUserTickets(event.userId);
       emit(TicketListLoadedState(list));
@@ -150,7 +152,9 @@ class TicketBloc extends Bloc<TicketEvent, TicketState> {
   }
 
   Future<void> _onFetchTukangActiveTickets(FetchTukangActiveTicketsEvent event, Emitter<TicketState> emit) async {
-    emit(TicketLoadingState());
+    if (state is! TicketListLoadedState && state is! TukangLockedSuccessState) {
+      emit(TicketLoadingState());
+    }
     try {
       final list = await ticketRepository.getTukangTickets(event.tukangId);
       emit(TicketListLoadedState(list));

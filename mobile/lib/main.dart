@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/constants/app_colors.dart';
 import 'core/constants/service_categories.dart';
+import 'core/services/supabase_storage_service.dart';
 import 'core/widgets/app_state_view.dart';
 import 'core/widgets/gps_requirement_dialog.dart';
 import 'data/models/ticket_model.dart';
@@ -27,6 +28,7 @@ import 'features/ticket/bloc/ticket_bloc.dart';
 import 'features/ticket/bloc/ticket_event.dart';
 import 'features/ticket/bloc/ticket_state.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'features/payment/pages/user_rating_modal.dart';
 import 'features/user/pages/create_ticket_page.dart';
 import 'features/user/pages/live_tracking_page.dart';
@@ -43,6 +45,16 @@ void main() async {
     );
   } catch (e) {
     debugPrint('Firebase initialization note: $e');
+  }
+  try {
+    await initializeDateFormatting('id_ID', null);
+  } catch (e) {
+    debugPrint('Date formatting initialization note: $e');
+  }
+  try {
+    await SupabaseStorageService.init();
+  } catch (e) {
+    debugPrint('Supabase storage initialization note: $e');
   }
   runApp(const BeresUserApp());
 }
@@ -111,7 +123,13 @@ class UserMainRouter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AuthBloc, AuthState>(
+    return BlocConsumer<AuthBloc, AuthState>(
+      listener: (context, state) {
+        // Jika akun Tukang terdeteksi aktif saat membuka User app, sign out agar sesi bersih
+        if (state is TukangAuthenticatedState) {
+          context.read<AuthBloc>().add(SignOutRequestedEvent());
+        }
+      },
       builder: (context, state) {
         if (state is UserAuthenticatedState) {
           return UserBottomNavWrapper(user: state.user);
@@ -1047,7 +1065,12 @@ class _UserTicketsPageState extends State<UserTicketsPage> {
   Widget _buildModernTicketCard(BuildContext context, TicketModel ticket) {
     final statusColor = _getStatusColor(ticket.status);
     final statusBgColor = _getStatusBgColor(ticket.status);
-    final formattedDate = DateFormat('d MMM yyyy, HH:mm', 'id_ID').format(ticket.createdAt);
+    String formattedDate;
+    try {
+      formattedDate = DateFormat('d MMM yyyy, HH:mm', 'id_ID').format(ticket.createdAt);
+    } catch (_) {
+      formattedDate = DateFormat('d MMM yyyy, HH:mm').format(ticket.createdAt);
+    }
 
     final hasTukang = ticket.selectedTukangName != null && ticket.selectedTukangName!.isNotEmpty;
 

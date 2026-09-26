@@ -7,12 +7,13 @@ import {
   ShieldCheck, 
   Phone, 
   Wrench, 
-  Briefcase
+  Briefcase,
+  Trash2
 } from 'lucide-react';
 import { useAdminData } from '../context/AdminDataContext';
 
 export default function KycApprovalPage() {
-  const { tukangList, approveKyc, rejectKyc } = useAdminData();
+  const { tukangList, approveKyc, rejectKyc, deleteTukang } = useAdminData();
   const [activeTab, setActiveTab] = useState('pending'); // 'pending' | 'verified' | 'rejected'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTukang, setSelectedTukang] = useState(null);
@@ -26,10 +27,10 @@ export default function KycApprovalPage() {
       t.verificationStatus === 'rejected';
 
     const matchesSearch = 
-      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.phone.includes(searchQuery) ||
-      (t.services && t.services.some(s => s.toLowerCase().includes(searchQuery.toLowerCase())));
+      (t.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.phone || '').includes(searchQuery) ||
+      (t.services && t.services.some(s => (s || '').toLowerCase().includes(searchQuery.toLowerCase())));
 
     return matchesTab && matchesSearch;
   });
@@ -153,7 +154,6 @@ export default function KycApprovalPage() {
                   <th className="py-3.5 px-5">Calon Mitra</th>
                   <th className="py-3.5 px-4">Kontak WhatsApp</th>
                   <th className="py-3.5 px-4">Keahlian Layanan</th>
-                  <th className="py-3.5 px-4">Metode Bayar</th>
                   <th className="py-3.5 px-4">Pengalaman / Bio</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-5 text-right">Aksi</th>
@@ -197,12 +197,6 @@ export default function KycApprovalPage() {
                           </span>
                         ))}
                       </div>
-                    </td>
-
-                    <td className="py-4 px-4">
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-semibold text-[10px] border border-emerald-100">
-                        Tunai di Tempat (Cash)
-                      </span>
                     </td>
 
                     <td className="py-4 px-4 max-w-[200px]">
@@ -334,15 +328,15 @@ export default function KycApprovalPage() {
                   <ul className="list-disc list-inside text-[11px] text-emerald-800 space-y-1">
                     <li>Nomor WhatsApp aktif dan dapat dihubungi pelanggan.</li>
                     <li>Kategori layanan sesuai dengan kemampuan nyata mitra.</li>
-                    <li>Metode transaksi dilakukan langsung secara tunai (Pure Cash) di lokasi konsumen.</li>
+                    <li>Mitra siap hadir tepat waktu sesuai lokasi pemesanan konsumen.</li>
                   </ul>
                 </div>
               </div>
 
-              {/* Sisi Kanan: Metode Transaksi & Layanan */}
+              {/* Sisi Kanan: Spesialisasi Layanan */}
               <div className="space-y-4">
                 <span className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
-                  Kategori Layanan & Metode Pembayaran
+                  Kategori & Spesialisasi Layanan
                 </span>
 
                 {/* Services Pills */}
@@ -356,22 +350,6 @@ export default function KycApprovalPage() {
                         {s}
                       </span>
                     ))}
-                  </div>
-                </div>
-
-                {/* Metode Pembayaran */}
-                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-2">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
-                    Metode Pembayaran Transaksi:
-                  </span>
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-                    <p className="text-xs text-slate-800 font-semibold flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                      Tunai Langsung di Tempat (Pure Cash)
-                    </p>
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      Mitra menerima uang tunai langsung dari konsumen setelah pekerjaan selesai diverifikasi. Tidak ada pemotongan komisi/saldo.
-                    </p>
                   </div>
                 </div>
 
@@ -417,6 +395,20 @@ export default function KycApprovalPage() {
               </div>
 
               <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Hapus permanen data calon mitra "${selectedTukang.name}" (ID: ${selectedTukang.id}) dari database?`)) {
+                      deleteTukang(selectedTukang.id);
+                      setSelectedTukang(null);
+                    }
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 text-xs font-semibold transition-colors flex items-center gap-1.5"
+                  title="Hapus data calon mitra dari database"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Hapus</span>
+                </button>
+
                 {!showRejectForm && (
                   <button
                     onClick={() => setShowRejectForm(true)}

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -44,9 +45,14 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
         .collection('tickets')
         .where('status', whereIn: ['OPEN', 'BIDDING'])
         .snapshots()
-        .listen((_) {
-      if (mounted) _fetchRadar();
-    });
+        .listen(
+      (_) {
+        if (mounted) _fetchRadar();
+      },
+      onError: (e) {
+        debugPrint('Radar stream watcher note: $e');
+      },
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       GpsRequirementDialog.checkAndShow(context, isTukang: true);
     });
@@ -125,7 +131,21 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
   /// Helper safe image builder
   Widget _buildSafeImage(String path, {double width = 64, double height = 64, double radius = 8}) {
     Widget img;
-    if (path.startsWith('http')) {
+    if (path.startsWith('data:image')) {
+      try {
+        final base64String = path.split(',').last;
+        final bytes = base64Decode(base64String);
+        img = Image.memory(
+          bytes,
+          width: width,
+          height: height,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _fallbackImage(width, height),
+        );
+      } catch (_) {
+        img = _fallbackImage(width, height);
+      }
+    } else if (path.startsWith('http')) {
       img = Image.network(
         path,
         width: width,
@@ -979,10 +999,10 @@ class _MitraJobFeedPageState extends State<MitraJobFeedPage> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: _buildQuickStatTile(
-                            icon: Icons.payments_rounded,
-                            iconColor: AppColors.successGreen,
-                            title: 'Tunai',
-                            subtitle: 'Metode Bayar',
+                            icon: Icons.handyman_rounded,
+                            iconColor: AppColors.primary,
+                            title: '${widget.tukang.services.length}',
+                            subtitle: 'Keahlian Aktif',
                           ),
                         ),
                       ],

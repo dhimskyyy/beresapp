@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
-import { Users, Search, ShoppingBag, MapPin, Calendar, CheckCircle2 } from 'lucide-react';
+import { Users, Search, ShoppingBag, MapPin, Calendar, CheckCircle2, Trash2 } from 'lucide-react';
 import { useAdminData } from '../context/AdminDataContext';
 
+const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80';
+
 export default function UserListPage() {
-  const { usersList } = useAdminData();
+  const { usersList, ticketsList, dataLoading, deleteUser } = useAdminData();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredUsers = usersList.filter(u => 
-    u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.phone.includes(searchQuery)
-  );
+  const filteredUsers = (usersList || []).filter(u => {
+    const q = searchQuery.toLowerCase();
+    const nameMatch = (u?.name || '').toLowerCase().includes(q);
+    const emailMatch = (u?.email || '').toLowerCase().includes(q);
+    const phoneMatch = (u?.phone || '').includes(searchQuery);
+    return nameMatch || emailMatch || phoneMatch;
+  });
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -19,7 +23,7 @@ export default function UserListPage() {
           <div className="flex items-center gap-2">
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Daftar Pengguna (Pelanggan)</h2>
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
-              Total {usersList.length} User
+              Total {usersList?.length || 0} User
             </span>
           </div>
           <p className="text-sm text-slate-500 mt-1">
@@ -55,49 +59,96 @@ export default function UserListPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredUsers.map((u) => (
-                <tr key={u.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-4 px-5">
-                    <div className="flex items-center gap-3">
-                      <img src={u.avatar} alt={u.name} className="w-10 h-10 rounded-xl object-cover ring-1 ring-slate-200" />
-                      <div>
-                        <p className="font-bold text-slate-900">{u.name}</p>
-                        <p className="text-slate-400 text-[11px] font-mono">{u.id}</p>
-                      </div>
-                    </div>
-                  </td>
-
-                  <td className="py-4 px-4 text-slate-700">
-                    <p className="font-medium">{u.phone}</p>
-                    <p className="text-slate-400 text-[11px]">{u.email}</p>
-                  </td>
-
-                  <td className="py-4 px-4 text-slate-600 max-w-xs truncate">
-                    <p className="flex items-center gap-1 text-[11px]">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate">{u.address}</span>
+              {filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <Users className="w-10 h-10 mx-auto text-slate-300 mb-2" />
+                    <p className="font-medium text-slate-600">
+                      {dataLoading?.users ? 'Memuat data pengguna...' : 'Tidak ada pengguna ditemukan'}
                     </p>
-                  </td>
-
-                  <td className="py-4 px-4">
-                    <span className="font-bold text-slate-900">{u.totalOrders}</span>
-                    <span className="text-slate-500 text-[11px]"> order selesai</span>
-                  </td>
-
-                  <td className="py-4 px-4">
-                    <p className="font-bold text-slate-900 font-mono">
-                      Rp {u.totalSpent.toLocaleString('id-ID')}
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {searchQuery ? 'Coba cari dengan kata kunci lain.' : 'Belum ada pengguna terdaftar di sistem.'}
                     </p>
-                  </td>
-
-                  <td className="py-4 px-5 text-right">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                      {u.status}
-                    </span>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredUsers.map((u) => {
+                  const userCompletedTickets = (ticketsList || []).filter(
+                    (t) => (t.userId === u.id || t.userId === u.uid) && t.status === 'COMPLETED'
+                  );
+                  const totalOrders = (u.totalOrders != null && u.totalOrders > 0) 
+                    ? u.totalOrders 
+                    : userCompletedTickets.length;
+                  const totalSpent = (u.totalSpent != null && u.totalSpent > 0) 
+                    ? u.totalSpent 
+                    : userCompletedTickets.reduce((sum, t) => sum + (t.finalBill?.totalAmount || 0), 0);
+                  const avatarUrl = u.avatar || u.photoUrl || DEFAULT_AVATAR;
+
+                  return (
+                    <tr key={u.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-4 px-5">
+                        <div className="flex items-center gap-3">
+                          <img 
+                            src={avatarUrl} 
+                            alt={u.name || 'User'} 
+                            onError={(e) => {
+                              e.currentTarget.src = DEFAULT_AVATAR;
+                            }}
+                            className="w-10 h-10 rounded-xl object-cover ring-1 ring-slate-200" 
+                          />
+                          <div>
+                            <p className="font-bold text-slate-900">{u.name || 'Pengguna Beres'}</p>
+                            <p className="text-slate-400 text-[11px] font-mono">{u.id}</p>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="py-4 px-4 text-slate-700">
+                        <p className="font-medium">{u.phone || '-'}</p>
+                        <p className="text-slate-400 text-[11px]">{u.email || '-'}</p>
+                      </td>
+
+                      <td className="py-4 px-4 text-slate-600 max-w-xs truncate">
+                        <p className="flex items-center gap-1 text-[11px]">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">{u.address || 'Alamat Belum Diatur'}</span>
+                        </p>
+                      </td>
+
+                      <td className="py-4 px-4">
+                        <span className="font-bold text-slate-900">{totalOrders}</span>
+                        <span className="text-slate-500 text-[11px]"> order selesai</span>
+                      </td>
+
+                      <td className="py-4 px-4">
+                        <p className="font-bold text-slate-900 font-mono">
+                          Rp {(totalSpent || 0).toLocaleString('id-ID')}
+                        </p>
+                      </td>
+
+                      <td className="py-4 px-5 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            {u.status || 'Aktif'}
+                          </span>
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Hapus permanen data pengguna "${u.name}" (ID: ${u.id}) dari database?`)) {
+                                deleteUser(u.id);
+                              }
+                            }}
+                            className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-colors"
+                            title="Hapus data pengguna dari database"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

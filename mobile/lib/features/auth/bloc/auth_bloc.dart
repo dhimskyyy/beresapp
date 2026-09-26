@@ -53,6 +53,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final user = await authRepository.loginUserWithEmail(event.email, event.password);
       emit(UserAuthenticatedState(user));
+    } on FirebaseAuthException catch (e) {
+      final message = switch (e.code) {
+        'role-mismatch' =>
+          e.message ?? 'Akun terdaftar sebagai Mitra Tukang. Silakan masuk melalui aplikasi Beres Mitra.',
+        'user-not-found' => (e.message != null && e.message!.contains('pelanggan'))
+            ? e.message!
+            : 'Email atau kata sandi salah. Silakan periksa kembali.',
+        'invalid-credential' || 'wrong-password' =>
+          'Email atau kata sandi salah. Silakan periksa kembali.',
+        'user-disabled' => 'Akun pengguna ini telah dinonaktifkan. Hubungi bantuan.',
+        'too-many-requests' => 'Terlalu banyak percobaan gagal. Harap tunggu beberapa saat.',
+        'network-request-failed' => 'Koneksi internet bermasalah. Periksa jaringan Anda.',
+        _ => e.message ?? 'Gagal login (${e.code})',
+      };
+      emit(AuthFailureState(message));
     } catch (e) {
       emit(AuthFailureState('Gagal login: ${e.toString()}'));
     }
@@ -68,6 +83,28 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         event.password,
       );
       emit(UserAuthenticatedState(user));
+    } on FirebaseAuthException catch (e) {
+      final message = switch (e.code) {
+        'role-mismatch' =>
+          e.message ?? 'Email ini sudah terdaftar sebagai Mitra Tukang.',
+        'email-already-in-use' =>
+          'Email ini sudah terdaftar. Silakan masuk di halaman Login menggunakan kata sandi Anda.',
+        'weak-password' => 'Kata sandi terlalu lemah. Gunakan minimal 6 karakter.',
+        'invalid-email' => 'Format email tidak valid. Periksa kembali penulisan email Anda.',
+        'operation-not-allowed' =>
+          'Metode pendaftaran Email/Password belum diaktifkan di Firebase Console.',
+        'network-request-failed' => 'Koneksi internet bermasalah. Periksa jaringan Anda.',
+        _ => e.message ?? 'Gagal registrasi (${e.code})',
+      };
+      emit(AuthFailureState(message));
+    } on FirebaseException catch (e) {
+      final message = switch (e.code) {
+        'permission-denied' =>
+          'Izin penyimpanan profil ditolak oleh aturan database (Firestore Rules).',
+        'unavailable' => 'Layanan database Firebase sedang offline.',
+        _ => 'Gagal menyimpan profil: ${e.message ?? e.code}',
+      };
+      emit(AuthFailureState(message));
     } catch (e) {
       emit(AuthFailureState('Gagal registrasi: ${e.toString()}'));
     }
@@ -100,11 +137,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(TukangAuthenticatedState(tukang));
     } on FirebaseAuthException catch (e) {
       final message = switch (e.code) {
-        'invalid-credential' || 'wrong-password' || 'user-not-found' =>
-          'Email atau password Mitra salah. Pastikan akun terdaftar di project Firebase yang benar.',
+        'role-mismatch' =>
+          e.message ?? 'Akun terdaftar sebagai Pelanggan. Silakan login di aplikasi Beres Pelanggan.',
+        'unverified-mitra' =>
+          e.message ?? 'Harap tunggu, akun Anda belum aktif. Pendaftaran masih menunggu persetujuan admin.',
+        'account-suspended' =>
+          e.message ?? 'Akun Mitra Anda sedang disuspend.',
+        'user-not-found' => (e.message != null && e.message!.contains('Mitra'))
+            ? e.message!
+            : 'Email atau kata sandi salah. Silakan periksa kembali.',
+        'invalid-credential' || 'wrong-password' =>
+          'Email atau kata sandi Mitra salah. Silakan periksa kembali.',
         'user-disabled' => 'Akun Mitra ini dinonaktifkan. Hubungi admin.',
         'too-many-requests' => 'Terlalu banyak percobaan login. Coba lagi beberapa saat.',
-        _ => 'Login Mitra gagal: ${e.message ?? e.code}',
+        'network-request-failed' => 'Koneksi internet bermasalah. Periksa jaringan Anda.',
+        _ => e.message ?? 'Login Mitra gagal: ${e.code}',
       };
       emit(AuthFailureState(message));
     } catch (e) {
@@ -127,6 +174,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         ktpPath: event.ktpPath,
       );
       emit(TukangAuthenticatedState(tukang));
+    } on FirebaseAuthException catch (e) {
+      final message = switch (e.code) {
+        'role-mismatch' =>
+          e.message ?? 'Email sudah terdaftar sebagai Akun Pelanggan.',
+        'email-already-in-use' =>
+          'Email ini sudah terdaftar. Silakan masuk di halaman login Mitra atau gunakan email lain.',
+        'weak-password' => 'Kata sandi terlalu lemah. Gunakan minimal 6 karakter.',
+        'invalid-email' => 'Format email tidak valid. Periksa kembali penulisan email Anda.',
+        'network-request-failed' => 'Koneksi internet bermasalah. Periksa jaringan Anda.',
+        _ => e.message ?? 'Gagal pendaftaran Mitra (${e.code})',
+      };
+      emit(AuthFailureState(message));
     } catch (e) {
       emit(AuthFailureState('Gagal pendaftaran Mitra: ${e.toString()}'));
     }

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/constants/app_colors.dart';
+import 'core/services/supabase_storage_service.dart';
 import 'core/widgets/app_state_view.dart';
 import 'data/models/ticket_model.dart';
 import 'data/models/tukang_model.dart';
@@ -26,6 +27,7 @@ import 'features/tukang/pages/mitra_job_feed_page.dart';
 import 'features/tukang/pages/mitra_job_history_page.dart';
 import 'features/tukang/pages/tukang_profile_page.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -36,6 +38,16 @@ void main() async {
     );
   } catch (e) {
     debugPrint('Firebase initialization note: $e');
+  }
+  try {
+    await initializeDateFormatting('id_ID', null);
+  } catch (e) {
+    debugPrint('Date formatting initialization note: $e');
+  }
+  try {
+    await SupabaseStorageService.init();
+  } catch (e) {
+    debugPrint('Supabase storage initialization note: $e');
   }
   runApp(const BeresMitraApp());
 }
@@ -103,7 +115,13 @@ class MitraMainRouter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AuthBloc, AuthState>(
+    return BlocConsumer<AuthBloc, AuthState>(
+      listener: (context, state) {
+        // Jika akun Pelanggan terdeteksi aktif saat membuka Mitra app, sign out agar sesi bersih
+        if (state is UserAuthenticatedState) {
+          context.read<AuthBloc>().add(SignOutRequestedEvent());
+        }
+      },
       builder: (context, state) {
         if (state is TukangAuthenticatedState) {
           final t = state.tukang;
@@ -262,11 +280,27 @@ class MitraBottomNavWrapper extends StatefulWidget {
 
 class _MitraBottomNavWrapperState extends State<MitraBottomNavWrapper> {
   int _selectedIndex = 0;
+  StreamSubscription? _tukangTicketsSub;
 
   @override
   void initState() {
     super.initState();
     context.read<TicketBloc>().add(FetchTukangActiveTicketsEvent(widget.tukang.id));
+    _tukangTicketsSub = FirebaseFirestore.instance
+        .collection('tickets')
+        .where('selectedTukangId', isEqualTo: widget.tukang.id)
+        .snapshots()
+        .listen((_) {
+      if (mounted) {
+        context.read<TicketBloc>().add(FetchTukangActiveTicketsEvent(widget.tukang.id));
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _tukangTicketsSub?.cancel();
+    super.dispose();
   }
 
   Widget _buildNavIcon(IconData unselectedIcon, IconData selectedIcon, int index) {
@@ -362,6 +396,7 @@ class MitraWorkManagementPage extends StatefulWidget {
 
 class _MitraWorkManagementPageState extends State<MitraWorkManagementPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  TicketModel? _cachedActiveTicket;
 
   @override
   void initState() {
@@ -379,15 +414,23 @@ class _MitraWorkManagementPageState extends State<MitraWorkManagementPage> with 
   Widget build(BuildContext context) {
     return BlocBuilder<TicketBloc, TicketState>(
       builder: (context, tState) {
-        TicketModel? activeTicket;
-        if (tState is TicketListLoadedState && tState.tickets.isNotEmpty) {
-          // Find first in-flight ticket (not completed and not canceled)
+        if (tState is TicketListLoadedState) {
           try {
-            activeTicket = tState.tickets.firstWhere((t) => t.status.isActive);
+            _cachedActiveTicket = tState.tickets.firstWhere((t) => t.status.isActive);
           } catch (_) {
-            activeTicket = null;
+            _cachedActiveTicket = null;
+          }
+        } else if (tState is TukangLockedSuccessState) {
+          if (tState.ticket.selectedTukangId == widget.tukang.id) {
+            if (tState.ticket.status.isActive) {
+              _cachedActiveTicket = tState.ticket;
+            } else {
+              _cachedActiveTicket = null;
+            }
           }
         }
+
+        final activeTicket = _cachedActiveTicket;
 
         return Scaffold(
           appBar: AppBar(
@@ -442,6 +485,9 @@ class _MitraWorkManagementPageState extends State<MitraWorkManagementPage> with 
   }
 
   Widget _buildActiveTabContent(TicketState tState, TicketModel? activeTicket) {
+    if (activeTicket != null) {
+      return MitraActiveJobPage(ticket: activeTicket, tukang: widget.tukang);
+    }
     if (tState is TicketLoadingState) {
       return const AppLoadingView(message: 'Memuat status pengerjaan...');
     }
@@ -451,9 +497,6 @@ class _MitraWorkManagementPageState extends State<MitraWorkManagementPage> with 
         message: tState.message,
         onRetry: () => context.read<TicketBloc>().add(FetchTukangActiveTicketsEvent(widget.tukang.id)),
       );
-    }
-    if (activeTicket != null) {
-      return MitraActiveJobPage(ticket: activeTicket, tukang: widget.tukang);
     }
     return Center(
       child: Padding(

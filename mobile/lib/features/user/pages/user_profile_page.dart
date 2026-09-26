@@ -564,22 +564,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           badgeText: '${_savedAddresses.length} Alamat',
                           onTap: _navigateToAddressList,
                         ),
-                        _buildProfileTile(
-                          icon: Icons.payments_outlined,
-                          iconBg: const Color(0xFFECFDF5),
-                          iconColor: AppColors.successGreen,
-                          title: 'Metode Pembayaran',
-                          subtitle: 'Tunai di tempat (Pure Cash) langsung ke mitra',
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Pembayaran dilakukan langsung dengan uang tunai kepada mitra teknisi di lokasi kerja setelah pekerjaan selesai.'),
-                                backgroundColor: AppColors.textDark,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          },
-                        ),
                       ],
                     ),
                   ),

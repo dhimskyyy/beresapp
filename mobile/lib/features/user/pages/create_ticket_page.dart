@@ -136,7 +136,12 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
-      final picked = await _picker.pickImage(source: source, imageQuality: 80);
+      final picked = await _picker.pickImage(
+        source: source,
+        imageQuality: 75,
+        maxWidth: 1024,
+        maxHeight: 1024,
+      );
       if (picked != null) {
         setState(() {
           _pickedPhotos.add(picked);

@@ -310,8 +310,8 @@ export default function TicketMonitorPage() {
                       </div>
                     ))}
                     <div className="flex justify-between p-3 bg-slate-50 font-bold border-t border-slate-200">
-                      <span>Total Pembayaran ({selectedTicket.paymentMethod ? selectedTicket.paymentMethod.toUpperCase() : 'CASH'})</span>
-                      <span className="text-emerald-700 font-mono">Rp {selectedTicket.finalBill.totalAmount.toLocaleString('id-ID')}</span>
+                      <span>Total Tagihan Akhir (Tunai Langsung)</span>
+                      <span className="text-emerald-700 font-mono">Rp {(selectedTicket.finalBill?.totalAmount || 0).toLocaleString('id-ID')}</span>
                     </div>
                   </div>
                 </div>

@@ -10,12 +10,14 @@ import {
   Star, 
   MoreVertical,
   RotateCcw,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Trash2,
+  MapPin
 } from 'lucide-react';
 import { useAdminData } from '../context/AdminDataContext';
 
 export default function TukangListPage() {
-  const { tukangList, suspendTukang, unsuspendTukang } = useAdminData();
+  const { tukangList, suspendTukang, unsuspendTukang, deleteTukang } = useAdminData();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedService, setSelectedService] = useState('ALL');
   const [suspendModalTukang, setSuspendModalTukang] = useState(null);
@@ -33,11 +35,11 @@ export default function TukangListPage() {
 
   const filteredTukang = tukangList.filter(t => {
     const matchesSearch = 
-      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.phone.includes(searchQuery) ||
-      t.email.toLowerCase().includes(searchQuery.toLowerCase());
+      (t.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.phone || '').includes(searchQuery) ||
+      (t.email || '').toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesService = selectedService === 'ALL' || t.services.includes(selectedService);
+    const matchesService = selectedService === 'ALL' || (t.services || []).includes(selectedService);
 
     return matchesSearch && matchesService;
   });
@@ -117,7 +119,7 @@ export default function TukangListPage() {
                 <th className="py-3.5 px-5">Profil Mitra</th>
                 <th className="py-3.5 px-4">Keahlian</th>
                 <th className="py-3.5 px-4">Rating & Order</th>
-                <th className="py-3.5 px-4">Metode Bayar</th>
+                <th className="py-3.5 px-4">Wilayah Operasional</th>
                 <th className="py-3.5 px-4">Status Akun</th>
                 <th className="py-3.5 px-5 text-right">Disiplin & Sanksi</th>
               </tr>
@@ -164,11 +166,11 @@ export default function TukangListPage() {
                     <p className="text-[11px] text-slate-500 mt-0.5">{t.totalJobsDone} pekerjaan tuntas</p>
                   </td>
 
-                  <td className="py-4 px-4">
-                    <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-semibold text-[11px] border border-emerald-100">
-                      Tunai di Tempat (Cash)
-                    </span>
-                    <p className="text-[10px] text-slate-400 mt-1">Langsung dari konsumen</p>
+                  <td className="py-4 px-4 text-slate-600 max-w-xs truncate">
+                    <p className="flex items-center gap-1 text-[11px]">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate">{t.currentLocation?.address || 'DKI Jakarta & Sekitarnya'}</span>
+                    </p>
                   </td>
 
                   <td className="py-4 px-4">
@@ -195,26 +197,42 @@ export default function TukangListPage() {
                   </td>
 
                   <td className="py-4 px-5 text-right">
-                    {t.isSuspended ? (
-                      <button
-                        onClick={() => unsuspendTukang(t.id)}
-                        className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 font-bold text-xs transition-colors flex items-center gap-1.5 ml-auto"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Cabut Suspend</span>
-                      </button>
-                    ) : (
+                    <div className="flex items-center justify-end gap-2">
+                      {t.isSuspended ? (
+                        <button
+                          onClick={() => unsuspendTukang(t.id)}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 font-bold text-xs transition-colors flex items-center gap-1.5"
+                          title="Cabut sanksi suspend"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Cabut Suspend</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setSuspendModalTukang(t);
+                            setSuspendReason(violationPresets[0]);
+                          }}
+                          className="px-3.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition-colors flex items-center gap-1.5"
+                          title="Terapkan suspend"
+                        >
+                          <ShieldAlert className="w-3.5 h-3.5" />
+                          <span>Suspend</span>
+                        </button>
+                      )}
+
                       <button
                         onClick={() => {
-                          setSuspendModalTukang(t);
-                          setSuspendReason(violationPresets[0]);
+                          if (window.confirm(`Hapus permanen data mitra "${t.name}" (ID: ${t.id}) dari database Firestore?`)) {
+                            deleteTukang(t.id);
+                          }
                         }}
-                        className="px-3.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition-colors flex items-center gap-1.5 ml-auto"
+                        className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-colors"
+                        title="Hapus data mitra dari database"
                       >
-                        <ShieldAlert className="w-3.5 h-3.5" />
-                        <span>Suspend 3 Hari</span>
+                        <Trash2 className="w-4 h-4" />
                       </button>
-                    )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -1417,22 +1417,6 @@ class _TukangProfilePageState extends State<TukangProfilePage> {
                   ),
 
                   _buildProfileTile(
-                    icon: Icons.payments_rounded,
-                    iconBg: const Color(0xFFECFDF5),
-                    iconColor: AppColors.successGreen,
-                    title: 'Metode Pembayaran',
-                    subtitle: 'Tunai di tempat (Pure Cash) langsung dari konsumen',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Pembayaran dilakukan tunai langsung oleh konsumen di lokasi kerja sesuai nota kesepakatan.'),
-                          backgroundColor: AppColors.textDark,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    },
-                  ),
-                  _buildProfileTile(
                     icon: Icons.map_outlined,
                     iconBg: const Color(0xFFEFF6FF),
                     iconColor: AppColors.primary,

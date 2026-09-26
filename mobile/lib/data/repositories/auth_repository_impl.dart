@@ -9,29 +9,49 @@ class AuthRepositoryImpl implements AuthRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  Future<UserModel> _loadUserProfile(User user) async {
-    final snapshot = await _firestore.collection('users').doc(user.uid).get();
-    if (!snapshot.exists) {
-      throw Exception('Profil user tidak ditemukan');
-    }
-    return UserModel.fromMap(snapshot.data()!, user.uid);
-  }
-
-  Future<TukangModel> _loadTukangProfile(User user) async {
-    final snapshot = await _firestore.collection('tukang').doc(user.uid).get();
-    if (!snapshot.exists) {
-      throw Exception('Profil mitra tidak ditemukan');
-    }
-    return TukangModel.fromMap(snapshot.data()!, user.uid);
-  }
-
   @override
   Future<UserModel> loginUserWithEmail(String email, String password) async {
     final credential = await _auth.signInWithEmailAndPassword(
       email: email.trim(),
       password: password,
     );
-    return _loadUserProfile(credential.user!);
+    final uid = credential.user!.uid;
+
+    // 1. Cek apakah akun ini sebenarnya terdaftar sebagai Mitra Tukang
+    final tukangSnapshot = await _firestore.collection('tukang').doc(uid).get();
+    if (tukangSnapshot.exists) {
+      // Hapus dokumen users jika sebelumnya sempat terbuat secara tidak sengaja
+      final userDoc = await _firestore.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        await _firestore.collection('users').doc(uid).delete().catchError((_) {});
+      }
+      await _auth.signOut();
+      throw FirebaseAuthException(
+        code: 'role-mismatch',
+        message: 'Akun "${email.trim()}" terdaftar sebagai Mitra Tukang. Silakan masuk melalui aplikasi Beres Mitra.',
+      );
+    }
+
+    // 2. Cek apakah benar-benar terdaftar di koleksi users
+    final userSnapshot = await _firestore.collection('users').doc(uid).get();
+    if (!userSnapshot.exists) {
+      await _auth.signOut();
+      throw FirebaseAuthException(
+        code: 'user-not-found',
+        message: 'Akun pelanggan belum terdaftar. Silakan daftar akun baru terlebih dahulu.',
+      );
+    }
+
+    final data = userSnapshot.data()!;
+    if (data['role'] != null && data['role'] != 'user') {
+      await _auth.signOut();
+      throw FirebaseAuthException(
+        code: 'role-mismatch',
+        message: 'Akun ini bukan akun Pelanggan. Akses ditolak.',
+      );
+    }
+
+    return UserModel.fromMap(data, uid);
   }
 
   @override
@@ -41,18 +61,43 @@ class AuthRepositoryImpl implements AuthRepository {
     String phone,
     String password,
   ) async {
+    final cleanEmail = email.trim().toLowerCase();
+
+    // 1. Cek apakah email sudah dipakai oleh Mitra Tukang
+    final tukangQuery = await _firestore
+        .collection('tukang')
+        .where('email', isEqualTo: cleanEmail)
+        .limit(1)
+        .get();
+    if (tukangQuery.docs.isNotEmpty) {
+      throw FirebaseAuthException(
+        code: 'role-mismatch',
+        message: 'Email "$cleanEmail" sudah terdaftar sebagai Mitra Tukang. Gunakan email berbeda untuk mendaftar akun Pelanggan.',
+      );
+    }
+
     final credential = await _auth.createUserWithEmailAndPassword(
-      email: email.trim(),
+      email: cleanEmail,
       password: password,
     );
+
+    // Pastikan Firebase Auth token sudah aktif di client sebelum menulis ke Firestore
+    await credential.user?.getIdToken(true);
+
     final user = UserModel(
       id: credential.user!.uid,
-      name: name,
-      email: email,
-      phone: phone,
+      name: name.trim().isNotEmpty ? name.trim() : (credential.user!.displayName ?? 'Pengguna Beres'),
+      email: cleanEmail,
+      phone: phone.trim(),
+      photoUrl: credential.user!.photoURL,
+      role: 'user',
       createdAt: DateTime.now(),
     );
-    await _firestore.collection('users').doc(user.id).set(user.toMap());
+
+    await _firestore.collection('users').doc(user.id).set(
+      user.toMap(),
+      SetOptions(merge: true),
+    );
     return user;
   }
 
@@ -67,7 +112,45 @@ class AuthRepositoryImpl implements AuthRepository {
       email: email.trim(),
       password: password,
     );
-    return _loadTukangProfile(credential.user!);
+    final uid = credential.user!.uid;
+
+    final tukangSnapshot = await _firestore.collection('tukang').doc(uid).get();
+    if (!tukangSnapshot.exists) {
+      // Cek apakah akun terdaftar sebagai user/pelanggan biasa
+      final userSnapshot = await _firestore.collection('users').doc(uid).get();
+      await _auth.signOut();
+      if (userSnapshot.exists) {
+        throw FirebaseAuthException(
+          code: 'role-mismatch',
+          message: 'Akun "${email.trim()}" terdaftar sebagai Pelanggan (User). Silakan login di aplikasi Beres Pelanggan.',
+        );
+      } else {
+        throw FirebaseAuthException(
+          code: 'user-not-found',
+          message: 'Akun Mitra Tukang belum terdaftar. Silakan daftar menjadi Mitra terlebih dahulu.',
+        );
+      }
+    }
+
+    final tukang = TukangModel.fromMap(tukangSnapshot.data()!, uid);
+
+    if (tukang.verificationStatus != 'verified') {
+      await _auth.signOut();
+      throw FirebaseAuthException(
+        code: 'unverified-mitra',
+        message: 'Harap tunggu, akun Anda belum aktif. Pendaftaran masih menunggu persetujuan admin.',
+      );
+    }
+
+    if (tukang.isCurrentlySuspended) {
+      await _auth.signOut();
+      throw FirebaseAuthException(
+        code: 'account-suspended',
+        message: 'Akun Mitra Anda sedang disuspend: ${tukang.suspendReason ?? "Pelanggaran ketentuan"}.',
+      );
+    }
+
+    return tukang;
   }
 
   @override
@@ -82,8 +165,23 @@ class AuthRepositoryImpl implements AuthRepository {
     required List<PayoutAccount> payoutAccounts,
     required String ktpPath,
   }) async {
+    final cleanEmail = email.trim().toLowerCase();
+
+    // 1. Cek apakah email sudah dipakai oleh akun Pelanggan
+    final userQuery = await _firestore
+        .collection('users')
+        .where('email', isEqualTo: cleanEmail)
+        .limit(1)
+        .get();
+    if (userQuery.docs.isNotEmpty) {
+      throw FirebaseAuthException(
+        code: 'role-mismatch',
+        message: 'Email "$cleanEmail" sudah terdaftar sebagai Akun Pelanggan. Gunakan email berbeda untuk mendaftar sebagai Mitra Tukang.',
+      );
+    }
+
     final credential = await _auth.createUserWithEmailAndPassword(
-      email: email.trim(),
+      email: cleanEmail,
       password: password,
     );
     final uploadedKtpUrl = ktpPath.isNotEmpty
@@ -96,7 +194,7 @@ class AuthRepositoryImpl implements AuthRepository {
     final tukang = TukangModel(
       id: credential.user!.uid,
       name: name,
-      email: email,
+      email: cleanEmail,
       phone: phone,
       birthDate: birthDate,
       age: age,
@@ -126,13 +224,14 @@ class AuthRepositoryImpl implements AuthRepository {
     final user = _auth.currentUser;
     if (user == null) return null;
 
-    final userProfile = await _firestore.collection('users').doc(user.uid).get();
-    if (userProfile.exists) return UserModel.fromMap(userProfile.data()!, user.uid);
-
     final tukangProfile = await _firestore.collection('tukang').doc(user.uid).get();
     if (tukangProfile.exists) return TukangModel.fromMap(tukangProfile.data()!, user.uid);
 
-    throw Exception('Profil akun tidak ditemukan');
+    final userProfile = await _firestore.collection('users').doc(user.uid).get();
+    if (userProfile.exists) return UserModel.fromMap(userProfile.data()!, user.uid);
+
+    await _auth.signOut();
+    return null;
   }
 
   @override

@@ -314,7 +314,12 @@ class _MitraJobHistoryPageState extends State<MitraJobHistoryPage> with SingleTi
     final isCompleted = ticket.status == TicketStatus.completed;
     final categoryMeta = ServiceCategories.findById(ticket.category);
     final totalEarnings = ticket.finalBill?.totalAmount ?? (ticket.bids.isNotEmpty ? ticket.bids.first.estimatedPrice : 0.0);
-    final dateStr = DateFormat('d MMM yyyy, HH:mm', 'id_ID').format(ticket.updatedAt);
+    String dateStr;
+    try {
+      dateStr = DateFormat('d MMM yyyy, HH:mm', 'id_ID').format(ticket.updatedAt);
+    } catch (_) {
+      dateStr = DateFormat('d MMM yyyy, HH:mm').format(ticket.updatedAt);
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),

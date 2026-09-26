@@ -24,7 +24,7 @@ class UserPaymentModal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currencyFormat = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
-    final double totalAmount = ticket.finalBill?.totalAmount ?? 150000;
+    final double totalAmount = ticket.finalBill?.totalAmount ?? 0;
     final items = ticket.finalBill?.items ?? [];
 
     return Container(
